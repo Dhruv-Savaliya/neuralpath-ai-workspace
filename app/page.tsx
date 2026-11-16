@@ -82,7 +82,7 @@ const videoLinks = [
 ["FastAPI full course","https://www.youtube.com/results?search_query=FastAPI+full+course+freecodecamp"],
 ];
 const days: Day[] = topics.map((t, i) => ({
-  day: i+1, title: t[0], phase: phases.find(p => i+1 >= Number(p.range.slice(0,2)) && i+1 <= Number(p.range.slice(-2)))!.name,
+  day: i+1, title: t[0], phase: phases.find(p => i + 1 >= Number(p.range.slice(0, 2)) && i + 1 <= Number(p.range.slice(-2)))?.name ?? "Portfolio & shipping",
   focus: t[1],
   tasks: [
     {id:"learn",title:"Learn the core concept",detail:`Study ${t[0].toLowerCase()} and write a short explanation in your own words.`,minutes:35,xp:20},
