@@ -49,6 +49,21 @@ export type WorkspaceDashboard = {
   };
 };
 
+export type KnowledgeSource = {
+  source_id: string;
+  title: string;
+  url: string | null;
+  created_at: string;
+  chunks: number;
+};
+
+export type AiChatResponse = {
+  answer: string;
+  provider: string;
+  model: string;
+  sources: Array<{ citation: string; title: string; url: string | null; similarity: number }>;
+};
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!baseUrl) throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured.");
   const supabase = createClient();
