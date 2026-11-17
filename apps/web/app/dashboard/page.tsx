@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { signOut } from "../actions/auth";
+import WorkspaceGoalsPanel from "./workspace-goals";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity, ArrowUpRight, Award, BookOpen, BrainCircuit, CalendarDays, Check,
@@ -163,6 +164,7 @@ export default function Home() {
     <section className="main-area">
       <header className="topbar"><div className="top-left"><button className="mobile-menu" onClick={()=>setMenuOpen(true)}><Menu size={20}/></button><div className="breadcrumb">Workspace <ChevronRight size={14}/> <b>{nav.find(n=>n.id===tab)?.label}</b></div></div><div className="top-actions"><div className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}</div><div className="xp-chip"><Zap size={15}/><b>{xp.toLocaleString()}</b><span>XP</span></div><div className="avatar top-avatar">DS</div></div></header>
       <div className="page-content">
+        {tab === "overview" && <WorkspaceGoalsPanel />}
         {tab==="overview"&&<AnimatePresence mode="wait"><motion.div key="overview" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:.25}}>
           <div className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-dot"/> YOUR PERSONAL AI BUILD SPACE</div><h1>Build your future in <span>AI.</span></h1><p className="subhead">Small steps. Real projects. Skills that compound. Let&apos;s make today count.</p></div><div className="date-note"><span>YOUR NEXT SESSION</span><b>Day {nextDay} <span>of 45</span></b><small>{days[nextDay-1].title}</small></div></div>
           <div className="hero-card"><div className="hero-grid"/><div className="hero-content"><div className="hero-kicker"><Sparkles size={14}/> TODAY&apos;S FOCUS · DAY {activeDay.toString().padStart(2,"0")}</div><h2>{day.title}</h2><p>{day.focus}. Build understanding by doing, not just watching.</p><div className="hero-meta"><span><Clock3 size={14}/> 2–3 hours</span><span><Target size={14}/> 4 focused tasks</span><span><Zap size={14}/> Up to 130 XP</span></div><button className="primary-btn" onClick={()=>setTab("roadmap")}>Open today&apos;s plan <ArrowUpRight size={16}/></button></div><div className="hero-art"><div className="orb orb-one"/><div className="orb orb-two"/><div className="orbit orbit-a"/><div className="orbit orbit-b"/><div className="core"><BrainCircuit size={46}/></div><div className="float-tag tag-top"><Code2 size={14}/> BUILD</div><div className="float-tag tag-bottom"><Sparkles size={14}/> EVOLVE</div></div></div>
