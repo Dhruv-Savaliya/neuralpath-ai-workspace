@@ -1,0 +1,1 @@
+import {Module} from "@nestjs/common";import {SupabaseAuthGuard} from "../auth/supabase-auth.guard";import {ProfileController} from "./profile.controller";import {ProfileService} from "./profile.service";@Module({controllers:[ProfileController],providers:[ProfileService,SupabaseAuthGuard]}) export class ProfileModule {}
