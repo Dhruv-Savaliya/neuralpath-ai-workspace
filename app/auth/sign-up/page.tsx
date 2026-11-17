@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import Link from "next/link";
 import { signUp } from "../../actions/auth";
 const errors:Record<string,string>={invalid_input:"Enter a valid email and a password with at least 8 characters.",signup_failed:"We couldn't create the account. Check your details and try again."};
