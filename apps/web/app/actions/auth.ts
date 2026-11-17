@@ -33,7 +33,7 @@ export async function signUp(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const displayName = String(formData.get("display_name") ?? "").trim().slice(0, 80);
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || password.length < 8 || password.length > 128) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 128) {
     redirect("/auth/sign-up?error=invalid_input");
   }
   const supabase = await createClient();
@@ -52,7 +52,7 @@ export async function signIn(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const next = safeNext(formData.get("next"));
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || !password || password.length > 128) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password || password.length > 128) {
     redirect("/auth/sign-in?error=invalid_input");
   }
   const supabase = await createClient();
@@ -91,7 +91,7 @@ export async function saveOnboarding(formData: FormData) {
     category:(categories[i] ?? "general").trim().slice(0,60),
     desired_outcome:(outcomes[i] ?? "").trim().slice(0,1000),
     current_level:levels.includes(goalLevels[i])?goalLevels[i]:level,
-    target_date:/^\\d{4}-\\d{2}-\\d{2}$/.test(dates[i] ?? "")?dates[i]:null,
+    target_date:/^\d{4}-\d{2}-\d{2}$/.test(dates[i] ?? "")?dates[i]:null,
   })).filter(g=>g.title.length>=3).slice(0,10);
 
   if (!professions.includes(p) || !levels.includes(level) || !["relaxed","balanced","intensive"].includes(pace) ||
