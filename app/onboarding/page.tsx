@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "../../lib/supabase/server";
 import { saveOnboarding } from "../actions/auth";
 const professions=[["student","Student"],["employed","Working professional"],["freelancer","Freelancer"],["founder","Founder"],["career_changer","Career changer"],["creator","Creator"],["exploring","Exploring"],["other","Other"]];
