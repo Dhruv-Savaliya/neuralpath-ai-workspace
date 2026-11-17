@@ -1,37 +1,46 @@
-# NeuralPath — AI Engineering Workspace
+# NeuralPath — Personalized Learning Platform
 
-A responsive personal learning dashboard built with Next.js, React, TypeScript, Tailwind CSS v4, Framer Motion, and Lucide icons.
+NeuralPath is an AI-powered learning platform designed for people across professions. Learners define what they want to achieve, share their starting point and preferences, and build a learning journey that can evolve with them.
 
-## Features
-- Daily AI engineering learning plan with 45 progressive topics
-- Interactive task checklist and day completion
-- XP, levels, streak counter, and achievement badges
-- Resource library with official docs and free video lesson searches
-- Knowledge checkpoint with reflection input
-- Progress saved locally in the browser (`localStorage`)
-- Responsive desktop, tablet, and mobile layouts
-- Motion-powered page transitions and modal interactions
+**Product promise:** Your goals. Your path. Your growth.
 
-## Run locally
+## Current stack
+- Next.js 15 / React 19 / TypeScript
+- Tailwind CSS v4
+- Framer Motion and Lucide icons
+- Vercel deployment
+
+## Public website
+- Home / landing page
+- About
+- Features
+- How it works
+- FAQ
+- Contact
+- Privacy and Terms (drafts requiring review)
+
+## Existing learning workspace
+The original 45-day AI Engineering learning dashboard is preserved at `/dashboard`. It remains one learning path among many; it is not the product's only profession.
+
+## Product roadmap
+See [docs/PRODUCT_VISION_AND_ROADMAP.md](docs/PRODUCT_VISION_AND_ROADMAP.md) for the full plan covering profession-agnostic onboarding, editable learner profiles, Supabase authentication and persistence, adaptive learning paths, AI provider abstraction, embeddings, chunking, vector retrieval, RAG, and launch quality gates.
+
+## Local development
 ```bash
 npm install
 npm run dev
-```
+``
+
 Open http://localhost:3000.
 
-## Deploy to Vercel
-1. Push this project to a GitHub repository.
-2. Import the repository at https://vercel.com/new.
-3. Keep the detected Next.js framework defaults.
-4. Deploy. No environment variables are required for the current local-first version.
+## Build and checks
+```bash
+npm run lint
+npm run build
+``
 
-## Progress storage
-This starter stores progress in the current browser only. It does not sync across devices or authenticate users. Add a database and authentication (e.g. Supabase or MongoDB) before treating progress as cloud-persistent.
+## Current implementation status
+The public website and existing dashboard are implemented in the repository. Authentication, onboarding persistence, Supabase-backed profiles/progress, AI provider integrations, embeddings, and RAG are planned work and must not be considered live until separately implemented, tested, and deployed.
 
-## Suggested next production upgrades
-- Auth + cloud sync for progress and streaks
-- Admin-editable curriculum and lesson links
-- Server-side quiz validation and richer question bank
-- GitHub API integration for verified commit activity
-- Vercel deployment status integration
-- Push notifications / daily study reminder
+## Environment variables
+No AI provider secrets belong in client-side variables. Supabase browser-safe configuration may use the public project URL and publishable key. Server-only keys must never use a `NEXT_PUBLIC_` prefix and must never be committed.
