@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -9,7 +8,7 @@ import {
   CheckCircle2, ChevronDown, ChevronRight, CircleHelp, Clock3, Code2, Flame,
   Github, GraduationCap, LayoutDashboard, Lightbulb, LockKeyhole, Menu,
   Play, Rocket, Sparkles, Target, Trophy, X, Zap, ExternalLink, Star,
-  ShieldCheck, CircleDot, Command, Coffee, ChartNoAxesCombined
+  ChartNoAxesCombined, type LucideIcon
 } from "lucide-react";
 
 type Task = { id: string; title: string; detail: string; minutes: number; xp: number };
@@ -71,10 +70,10 @@ const topics = [
 ["Deployment & observability","Deploy API, logs, rate limits, secrets"],
 ["Portfolio launch","README, demo, architecture diagram, interview story"],
 ];
-const resources = [
+const resources: [string, string][] = [
 ["Python tutorial","https://docs.python.org/3/tutorial/"],["Kaggle Python","https://www.kaggle.com/learn/python"],["Kaggle Pandas","https://www.kaggle.com/learn/pandas"],["Google ML Crash Course","https://developers.google.com/machine-learning/crash-course"],["scikit-learn user guide","https://scikit-learn.org/stable/user_guide.html"],["PyTorch tutorials","https://pytorch.org/tutorials/"],["Hugging Face LLM Course","https://huggingface.co/learn/llm-course/chapter1/1"],["DeepLearning.AI short courses","https://www.deeplearning.ai/short-courses/"],["FastAPI tutorial","https://fastapi.tiangolo.com/tutorial/"],["Docker getting started","https://docs.docker.com/get-started/"],["Next.js Learn","https://nextjs.org/learn"],["GitHub Skills","https://skills.github.com/"]
 ];
-const videoLinks = [
+const videoLinks: [string, string][] = [
 ["Python for Beginners — freeCodeCamp","https://www.youtube.com/results?search_query=freecodecamp+python+for+beginners+full+course"],
 ["Python OOP — Corey Schafer","https://www.youtube.com/results?search_query=Corey+Schafer+Python+OOP"],
 ["Machine Learning — StatQuest","https://www.youtube.com/results?search_query=StatQuest+machine+learning+playlist"],
@@ -92,8 +91,8 @@ const days: Day[] = topics.map((t, i) => ({
     {id:"notes",title:"Make concise notes",detail:"Write 3 takeaways and 1 question you still have.",minutes:15,xp:10},
     {id:"ship",title:"Commit your progress",detail:"Push today's code and add a useful README note.",minutes:15,xp:15},
   ],
-  resource: resources[Math.min(i < 7 ? 0 : i < 12 ? 1 : i < 20 ? 4 : i < 25 ? 5 : i < 32 ? 6 : i < 38 ? 8 : 9, resources.length-1)] as any,
-  video: videoLinks[Math.min(i < 7 ? 0 : i < 20 ? 2 : i < 25 ? 3 : i < 32 ? 4 : i < 38 ? 5 : 6, videoLinks.length-1)] as any,
+  resource: (() => { const item = resources[Math.min(i < 7 ? 0 : i < 12 ? 1 : i < 20 ? 4 : i < 25 ? 5 : i < 32 ? 6 : i < 38 ? 8 : 9, resources.length-1)]; return { label: item[0], url: item[1] }; })(),
+  video: (() => { const item = videoLinks[Math.min(i < 7 ? 0 : i < 20 ? 0 : i < 25 ? 3 : i < 32 ? 4 : i < 38 ? 5 : 6, videoLinks.length-1)]; return { label: item[0], url: item[1] }; })(),
   deliverable: i===6 ? "A CLI expense tracker with JSON persistence and clear input validation." : i===19 ? "A reproducible ML model that predicts expense categories and reports evaluation metrics." : i===24 ? "A trained PyTorch model with a saved checkpoint and a short experiment log." : i===34 ? "A document Q&A prototype that retrieves relevant chunks and cites its sources." : i===44 ? "A deployed BizDhan AI demo, architecture diagram, README, and portfolio case study." : `A small, tested ${t[0].toLowerCase()} exercise committed to your learning repository.`,
   quiz: `Can you explain ${t[0].toLowerCase()} in plain language, implement a tiny example from memory, and describe one real-world use?`
 }));
@@ -182,5 +181,5 @@ export default function Home() {
     <AnimatePresence>{toast&&<motion.div className="toast" initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} exit={{opacity:0,y:10}}><CheckCircle2 size={17}/>{toast}</motion.div>}</AnimatePresence>
   </main>;
 }
-function Stat({icon:Icon,label,value,detail,tone}:{icon:any,label:string,value:string,detail:string,tone:string}){return <div className="stat-card"><div className={`stat-icon ${tone}`}><Icon size={18}/></div><div><small>{label}</small><b>{value}</b><span>{detail}</span></div></div>}
+function Stat({icon:Icon,label,value,detail,tone}:{icon:LucideIcon,label:string,value:string,detail:string,tone:string}){return <div className="stat-card"><div className={`stat-icon ${tone}`}><Icon size={18}/></div><div><small>{label}</small><b>{value}</b><span>{detail}</span></div></div>}
 function TaskRow({task,index,done,onToggle}:{task:Task,index:number,done:boolean,onToggle:()=>void}){return <div className={`task-row ${done?"task-done":""}`}><button className="task-check" onClick={onToggle} aria-label={done?"Mark incomplete":"Mark complete"}>{done?<Check size={15}/>:<span/>}</button><div className="task-index">{String(index+1).padStart(2,"0")}</div><div className="task-copy"><b>{task.title}</b><small>{task.detail}</small></div><div className="task-meta"><span><Clock3 size={12}/>{task.minutes}m</span><span className="task-xp">+{task.xp} XP</span></div></div>}
