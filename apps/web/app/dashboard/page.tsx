@@ -117,7 +117,6 @@ export default function Home() {
   const [toast,setToast] = useState("");
   const [hydrated,setHydrated] = useState(false);
   const [pathItems,setPathItems] = useState<ApiPathItem[]>([]);
-  const [cloudReady,setCloudReady] = useState(false);
   useEffect(() => {
     try {
       const raw = localStorage.getItem("neuralpath-progress-v1");
@@ -138,7 +137,7 @@ export default function Home() {
           dashboard = await neuralPathApi.getDashboard();
           selectedPath = dashboard.paths.find(path => path.id === selectedPath?.id) ?? dashboard.paths[0];
         }
-        if (!active || !selectedPath) { if(active) setCloudReady(true); return; }
+        if (!active || !selectedPath) {  return; }
         const items = selectedPath.items ?? [];
         const nextChecked: Record<string,boolean> = {};
         const nextCompleted: number[] = [];
@@ -158,9 +157,8 @@ export default function Home() {
         setChecked(nextChecked);
         setCompleted(nextCompleted);
         setXp(earnedXp);
-        setCloudReady(true);
       } catch (cause) {
-        if (active) { setCloudReady(false); notify(cause instanceof Error ? cause.message : "Cloud progress could not be loaded."); }
+        if (active) { notify(cause instanceof Error ? cause.message : "Cloud progress could not be loaded."); }
       }
     })();
     return () => { active = false; };
@@ -233,7 +231,7 @@ export default function Home() {
         <footer className="footer"><span>NEURALPATH <i>·</i> BUILT FOR THE LONG GAME</span><span>Learn with intent. Build with care. Ship with confidence.</span></footer>
       </div>
     </section>
-    <AnimatePresence>{showQuiz&&<motion.div className="modal-backdrop" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>setShowQuiz(false)}><motion.div className="quiz-modal" initial={{y:20,scale:.97}} animate={{y:0,scale:1}} exit={{y:15,scale:.98}} onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowQuiz(false)}><X size={18}/></button><div className="quiz-label"><CircleHelp size={16}/> KNOWLEDGE CHECK</div><h2>Can you teach it back?</h2><p>{day.quiz}</p><textarea value={quizAnswer} onChange={e=>setQuizAnswer(e.target.value)} placeholder="Write a short answer in your own words..." rows={4}/><button className="primary-btn full-btn" onClick={async ()=>{if(quizAnswer.trim().length<20){notify("Write at least a couple of sentences to reflect.");return;}const item=pathItems.find(candidate=>candidate.position===(activeDay-1)*4);if(!item){notify("Your cloud learning path is not ready yet.");return;}try{await neuralPathApi.saveProgress({path_item_id:item.id,status:checked[`${activeDay}-learn`]?"completed":"in_progress",reflection:quizAnswer.trim()});setXp(v=>v+10);setShowQuiz(false);setQuizAnswer("");notify("Reflection saved to your account. +10 XP!");}catch(cause){notify(cause instanceof Error?cause.message:"Unable to save reflection.");}}}>Save reflection <Check size={15}/></button><small className="modal-hint">Your reflection is saved with your learning progress.</small></motion.div></motion.div>}</AnimatePresence>
+    <AnimatePresence>{showQuiz&&<motion.div className="modal-backdrop" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>setShowQuiz(false)}><motion.div className="quiz-modal" initial={{y:20,scale:.97}} animate={{y:0,scale:1}} exit={{y:15,scale:.98}} onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowQuiz(false)}><X size={18}/></button><div className="quiz-label"><CircleHelp size={16}/> KNOWLEDGE CHECK</div><h2>Can you teach it back?</h2><p>{day.quiz}</p><textarea value={quizAnswer} onChange={e=>setQuizAnswer(e.target.value)} placeholder="Write a short answer in your own words..." rows={4}/><button className="primary-btn full-btn" onClick={async ()=>{if(quizAnswer.trim().length<20){notify("Write at least a couple of sentences to reflect.");return;}const item=pathItems.find(candidate=>candidate.position===(activeDay-1)*4);if(!item){notify("Your cloud learning path is not ready yet.");return;}try{await neuralPathApi.saveProgress({path_item_id:item.id,status:checked[`${activeDay}-learn`]?"completed":"in_progress",reflection:quizAnswer.trim()});setShowQuiz(false);setQuizAnswer("");notify("Reflection saved to your account.");}catch(cause){notify(cause instanceof Error?cause.message:"Unable to save reflection.");}}}>Save reflection <Check size={15}/></button><small className="modal-hint">Your reflection is saved with your learning progress.</small></motion.div></motion.div>}</AnimatePresence>
     <AnimatePresence>{toast&&<motion.div className="toast" initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} exit={{opacity:0,y:10}}><CheckCircle2 size={17}/>{toast}</motion.div>}</AnimatePresence>
   </main>;
 }
