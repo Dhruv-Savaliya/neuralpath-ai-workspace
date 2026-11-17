@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import { Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import type { AuthenticatedRequest } from "../common/authenticated-request";
 import type { BootstrapPathDto } from "./dto/bootstrap-path.dto";
 
