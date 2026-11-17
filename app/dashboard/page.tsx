@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { signOut } from "../actions/auth";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity, ArrowUpRight, Award, BookOpen, BrainCircuit, CalendarDays, Check,
@@ -157,7 +158,7 @@ export default function Home() {
       <div className="workspace-label">YOUR JOURNEY</div>
       <div className="side-progress"><div className="side-progress-top"><span>Overall progress</span><b>{progress}%</b></div><div className="progress-track"><i style={{width:`${progress}%`}}/></div><small>{completed.length} of 45 days completed</small></div>
       <div className="phase-menu">{phases.map((p,i)=><button key={p.name} onClick={()=>{setActiveDay(Number(p.range.slice(0,2)));setTab("roadmap");setMenuOpen(false)}} className="phase-link"><span className={`phase-dot ${p.tone}`}/><span>{p.name}</span><small>{p.range}</small></button>)}</div>
-      <div className="sidebar-bottom"><div className="streak-card"><div className="streak-icon"><Flame size={18}/></div><div><b>{streak} day streak</b><small>Keep your momentum alive</small></div><Sparkles size={16} className="streak-spark"/></div><div className="profile-row"><div className="avatar">DS</div><div><b>Dhruv Savaliya</b><small>Level {level} · AI Engineer in progress</small></div><ChevronDown size={16}/></div></div>
+      <div className="sidebar-bottom"><div className="streak-card"><div className="streak-icon"><Flame size={18}/></div><div><b>{streak} day streak</b><small>Keep your momentum alive</small></div><Sparkles size={16} className="streak-spark"/></div><div className="profile-row"><div className="avatar">DS</div><div><b>Dhruv Savaliya</b><small>Level {level} · AI Engineer in progress</small></div><ChevronDown size={16}/></div><form action={signOut} className="signout-form"><button type="submit">Sign out</button></form></div>
     </aside>
     {menuOpen&&<div className="mobile-scrim" onClick={()=>setMenuOpen(false)}/>}
     <section className="main-area">
