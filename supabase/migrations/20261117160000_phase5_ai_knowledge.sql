@@ -95,8 +95,8 @@ as $$
     (1 - (kc.embedding OPERATOR(extensions.<=>) query_embedding))::real as similarity
   from public.knowledge_chunks as kc
   where kc.user_id = (select auth.uid())
-    and 1 - (kc.embedding <=> query_embedding) > match_threshold
-  order by kc.embedding <=> query_embedding
+    and 1 - (kc.embedding OPERATOR(extensions.<=>) query_embedding) > match_threshold
+  order by kc.embedding OPERATOR(extensions.<=>) query_embedding
   limit least(greatest(match_count, 1), 10);
 $$;
 
