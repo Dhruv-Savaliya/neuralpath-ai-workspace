@@ -4,6 +4,9 @@ import { createClient } from "../supabase/client";
 
 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
 
+export type ApiPathItem = { id: string; title: string; description: string; position: number; status: string; progress?: string; reflection?: string; completedAt?: string | null };
+export type ApiPath = { id: string; title: string; status: string; goal_id: string; items: ApiPathItem[] };
+
 export type ApiGoal = {
   id: string;
   title: string;
@@ -12,7 +15,7 @@ export type ApiGoal = {
   current_level: string;
   target_date: string | null;
   status: "active" | "paused" | "completed" | "archived";
-  paths: Array<{ id: string; title: string; status: string; items: Array<{ id: string; title: string; progress: string }> }>;
+  paths: ApiPath[];
 };
 
 export type WorkspaceDashboard = {
@@ -55,7 +58,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const neuralPathApi = {
   isConfigured: Boolean(baseUrl),
   getDashboard: () => request<WorkspaceDashboard>("/dashboard"),
-  getGoals: () => request<ApiGoal[]>("/goals"),
+  getGoals: () => request<ApiGoal[]>("/goals"),\n  getProfile: () => request<{ id: string; display_name: string; profession: string; experience_level: string; interests: string[]; timezone: string }>("/profile"),\n  updateProfile: (input: { display_name?: string; profession?: string; experience_level?: string; interests?: string[]; timezone?: string }) => request("/profile", { method: "PATCH", body: JSON.stringify(input) }),\n  updateGoal: (id: string, input: Partial<Pick<ApiGoal, "title" | "category" | "desired_outcome" | "current_level" | "target_date" | "status">>) => request<ApiGoal>(`/goals/${id}`, { method: "PATCH", body: JSON.stringify(input) }),\n  deleteGoal: (id: string) => request<{ deleted: boolean; id: string }>(`/goals/${id}`, { method: "DELETE" }),\n  bootstrapPath: (goal_id: string) => request<ApiPath>("/paths/bootstrap", { method: "POST", body: JSON.stringify({ goal_id }) }),
   createGoal: (input: { title: string; category?: string; desired_outcome?: string; current_level?: string; target_date?: string; weekly_minutes?: number }) =>
     request<ApiGoal>("/goals", { method: "POST", body: JSON.stringify(input) }),
   saveProgress: (input: { path_item_id: string; status: "in_progress" | "completed"; reflection?: string }) =>
