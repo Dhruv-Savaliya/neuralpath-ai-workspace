@@ -85,14 +85,14 @@ returns table (
 language sql
 stable
 security invoker
-set search_path = ''
+set search_path = pg_catalog, extensions
 as $$
   select
     kc.id,
     kc.source_title,
     kc.source_url,
     kc.content,
-    (1 - (kc.embedding <=> query_embedding))::real as similarity
+    (1 - (kc.embedding OPERATOR(extensions.<=>) query_embedding))::real as similarity
   from public.knowledge_chunks as kc
   where kc.user_id = (select auth.uid())
     and 1 - (kc.embedding <=> query_embedding) > match_threshold
