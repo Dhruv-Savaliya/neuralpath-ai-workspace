@@ -19,7 +19,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix("api/v1");
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
       if (!origin || origins.includes(origin) || isNeuralPathVercelPreview(origin)) {
         callback(null, true);
         return;
