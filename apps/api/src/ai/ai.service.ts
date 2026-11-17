@@ -182,6 +182,9 @@ export class AiService {
     if (configuredDimensions !== this.dimensions) {
       throw new ServiceUnavailableException("The configured embedding dimensions must be 1024 for BGE-M3.");
     }
+    if (model !== this.model) {
+      throw new ServiceUnavailableException("Only @cf/baai/bge-m3 is enabled for the current vector schema.");
+    }
 
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${encodeURIComponent(model)}`;
     let response: Response;
