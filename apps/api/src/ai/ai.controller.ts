@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Param, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import type { AuthenticatedRequest } from "../common/authenticated-request";
 import { SupabaseAuthGuard } from "../auth/supabase-auth.guard";
@@ -10,6 +10,11 @@ import { IngestKnowledgeDto } from "./dto/ingest-knowledge.dto";
 @UseGuards(SupabaseAuthGuard)
 export class AiController {
   constructor(private readonly ai: AiService) {}
+
+  @Get("knowledge")
+  listKnowledge(@Req() req: AuthenticatedRequest) {
+    return this.ai.listKnowledge(req);
+  }
 
   @Post("knowledge")
   @Throttle({ default: { limit: 5, ttl: 60000 } })
