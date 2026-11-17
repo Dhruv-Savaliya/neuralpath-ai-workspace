@@ -93,7 +93,7 @@ export default function WorkspaceGoalsPanel() {
         </>
       )}
 
-      <form onSubmit={submitGoal} style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr) auto", gap: 10, alignItems: "end" }}>
+      <form className="workspace-goals-form" onSubmit={submitGoal}>
         <label style={{ display: "grid", gap: 6, fontSize: 13 }}>
           Goal title
           <input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} minLength={3} required placeholder="e.g. Learn full-stack development" style={{ width: "100%", padding: "11px 12px", borderRadius: 9, border: "1px solid var(--border, #374151)", background: "transparent", color: "inherit" }} />
@@ -102,7 +102,7 @@ export default function WorkspaceGoalsPanel() {
           Category
           <input value={category} onChange={(event) => setCategory(event.target.value)} maxLength={60} placeholder="e.g. Technology" style={{ width: "100%", padding: "11px 12px", borderRadius: 9, border: "1px solid var(--border, #374151)", background: "transparent", color: "inherit" }} />
         </label>
-        <button className="primary-btn" type="submit" disabled={saving || loading} style={{ whiteSpace: "nowrap" }}>
+        <button className="primary-btn workspace-goals-submit" type="submit" disabled={saving || loading}>
           {saving ? <LoaderCircle size={15} /> : <Plus size={15} />} Save goal
         </button>
       </form>
