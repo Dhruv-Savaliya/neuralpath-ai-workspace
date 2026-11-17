@@ -16,7 +16,7 @@ Phase 3 adds a dedicated NestJS API under apps/api. Next.js remains presentation
 ## Remaining Phase 3 work
 1. Deploy NestJS service and configure its production origin.
 2. Add typed Next.js API client forwarding the signed-in user's access token.
-3. Replace local-only dashboard progress with server-backed progress and hydrate UI from dashboard endpoint.
+3. Wire the typed Next.js API client into the dashboard and replace local-only progress with server-backed progress.
 4. Add path and path-item authoring/generation flows so goals become persisted learning plans.
 5. Add projects, resources, assessments, reflections and weekly analytics.
 6. Add integration tests for authentication, owner isolation and progress persistence.
