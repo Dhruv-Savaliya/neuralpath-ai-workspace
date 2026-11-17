@@ -8,6 +8,9 @@ export type ApiGoal = {
   id: string;
   title: string;
   category: string;
+  desired_outcome: string;
+  current_level: string;
+  target_date: string | null;
   status: "active" | "paused" | "completed" | "archived";
   paths: Array<{ id: string; title: string; status: string; items: Array<{ id: string; title: string; progress: string }> }>;
 };
