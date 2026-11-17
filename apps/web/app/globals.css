@@ -42,3 +42,28 @@ body{background:var(--site-bg)}
 @media(max-width:650px){.auth-card{padding:26px 21px}.auth-card h1{font-size:31px}.onboarding-header{padding:0 18px}.onboarding-header>span{font-size:8px}.onboarding-wrap{padding:32px 16px 65px}.onboarding-section{padding:18px 15px}.choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.onboarding-submit{align-items:stretch;flex-direction:column}.onboarding-submit button{width:100%}}
 
 .signout-form{padding:10px 3px 0}.signout-form button{border:1px solid var(--line);background:transparent;color:#9ba8bf;border-radius:7px;padding:7px 10px;font-size:10px;width:100%;text-align:left}.signout-form button:hover{border-color:#a99aff;color:#e5deff}
+
+
+/* Learner workspace integration */
+.workspace-goals-form{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto;gap:10px;align-items:end}
+.workspace-goals-form input{min-width:0}
+.workspace-goals-submit{white-space:nowrap}
+@media(max-width:650px){
+  .workspace-goals-form{grid-template-columns:minmax(0,1fr);gap:12px}
+  .workspace-goals-submit{width:100%;min-height:44px;justify-content:center}
+  .workspace-goals-form label{min-width:0}
+}
+
+
+/* Phase 4 learner profile and goal controls */
+.workspace-profile-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.workspace-profile-form label,.workspace-goals-edit{display:grid;gap:6px;font-size:13px;min-width:0}
+.workspace-profile-form input,.workspace-profile-form select,.workspace-goals-edit input{width:100%;min-width:0;padding:11px 12px;border-radius:9px;border:1px solid var(--border,#374151);background:transparent;color:inherit}
+.workspace-goal-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
+.workspace-goal-actions button{display:inline-flex;align-items:center;gap:6px}
+.workspace-goals-edit{grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto auto;align-items:end}
+@media(max-width:650px){
+ .workspace-profile-form{grid-template-columns:minmax(0,1fr)}
+ .workspace-goals-edit{grid-template-columns:minmax(0,1fr)}
+ .workspace-goal-actions{gap:8px}
+}
