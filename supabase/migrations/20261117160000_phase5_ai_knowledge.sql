@@ -20,6 +20,8 @@ create table if not exists public.knowledge_chunks (
 
 create index if not exists knowledge_chunks_owner_source_idx
   on public.knowledge_chunks(user_id, source_id);
+create index if not exists knowledge_chunks_owner_created_idx
+  on public.knowledge_chunks(user_id, created_at desc);
 create index if not exists knowledge_chunks_embedding_hnsw_idx
   on public.knowledge_chunks using hnsw (embedding extensions.vector_cosine_ops);
 
