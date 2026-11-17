@@ -37,6 +37,12 @@ Never use `NEXT_PUBLIC_` for provider secrets.
 
 All endpoints require a valid Supabase access token in `Authorization: Bearer <token>`.
 
+### List private sources
+
+`GET /api/v1/ai/knowledge`
+
+Returns the signed-in user's source titles, source URLs, creation dates, and chunk counts. Results are grouped by source ID and scoped to the authenticated owner.
+
 ### Add a text source
 
 `POST /api/v1/ai/knowledge`
