@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { signOut } from "../actions/auth";
 import WorkspaceGoalsPanel from "./workspace-goals";
 import WorkspaceProfilePanel from "./workspace-profile";
@@ -117,6 +117,7 @@ export default function Home() {
   const [toast,setToast] = useState("");
   const [hydrated,setHydrated] = useState(false);
   const [pathItems,setPathItems] = useState<ApiPathItem[]>([]);
+  const notify = useCallback((s:string) => { setToast(s); window.setTimeout(()=>setToast(""),2600); },[]);
   useEffect(() => {
     try {
       const raw = localStorage.getItem("neuralpath-progress-v1");
@@ -162,14 +163,13 @@ export default function Home() {
       }
     })();
     return () => { active = false; };
-  },[hydrated]);
+  },[hydrated,notify]);
   const day = days[activeDay-1];
   const doneTasks = day.tasks.filter(t=>checked[`${activeDay}-${t.id}`]).length;
   const progress = Math.round(completed.length/45*100);
   const level = Math.floor(xp/250)+1;
   const xpInLevel = xp%250;
   const nextDay = completed.length ? Math.min(45,Math.max(...completed)+1) : 1;
-  const notify = (s:string) => { setToast(s); window.setTimeout(()=>setToast(""),2600); };
   async function toggleTask(id:string) {
     const key=`${activeDay}-${id}`, was=!!checked[key], task=day.tasks.find(t=>t.id===id)!;
     const itemPosition=(activeDay-1)*4+["learn","code","notes","ship"].indexOf(id);
