@@ -1,7 +1,28 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "../../lib/supabase/server";
+
+async function getAuthRedirectBaseUrl() {
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "";
+  const normalizedHost = host.split(",")[0].trim().toLowerCase();
+
+  // Trust only this app's Vercel deployment hosts and local development.
+  if (
+    normalizedHost === "neuralpath-ai-workspace.vercel.app" ||
+    normalizedHost.startsWith("neuralpath-ai-workspace-") && normalizedHost.endsWith(".vercel.app")
+  ) {
+    return `https://${normalizedHost}`;
+  }
+
+  if (normalizedHost === "localhost:3000" || normalizedHost === "127.0.0.1:3000") {
+    return `http://${normalizedHost}`;
+  }
+
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://neuralpath-ai-workspace.vercel.app").replace(/\/$/, "");
+}
 
 function safeNext(value: FormDataEntryValue | null) {
   const path = typeof value === "string" ? value : "";
@@ -16,10 +37,11 @@ export async function signUp(formData: FormData) {
     redirect("/auth/sign-up?error=invalid_input");
   }
   const supabase = await createClient();
+  const redirectBaseUrl = await getAuthRedirectBaseUrl();
   const { error } = await supabase.auth.signUp({
     email, password, options: {
       data: { display_name: displayName },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/auth/callback?next=/onboarding`,
+      emailRedirectTo: `${redirectBaseUrl}/auth/callback?next=/onboarding`,
     },
   });
   if (error) redirect("/auth/sign-up?error=signup_failed");

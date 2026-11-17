@@ -1,0 +1,1 @@
+import {Module} from "@nestjs/common";import {SupabaseAuthGuard} from "../auth/supabase-auth.guard";import {ProgressController} from "./progress.controller";import {ProgressService} from "./progress.service";@Module({controllers:[ProgressController],providers:[ProgressService,SupabaseAuthGuard]}) export class ProgressModule {}

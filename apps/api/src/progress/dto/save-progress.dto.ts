@@ -1,0 +1,1 @@
+import {IsIn,IsOptional,IsString,IsUUID,MaxLength} from "class-validator";export class SaveProgressDto {@IsUUID() path_item_id!:string;@IsIn(["in_progress","completed"]) status!:"in_progress"|"completed";@IsOptional() @IsString() @MaxLength(4000) reflection?:string;}

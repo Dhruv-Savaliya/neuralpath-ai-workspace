@@ -1,30 +1,22 @@
 {
-  "name": "neuralpath-ai-dashboard",
+  "name": "neuralpath",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "npm@10.9.2",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint ."
-  },
-  "dependencies": {
-    "framer-motion": "^12.23.12",
-    "lucide-react": "^0.468.0",
-    "next": "^15.5.6",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "@supabase/ssr": "^0.7.0",
-    "@supabase/supabase-js": "^2.57.0"
+    "dev": "turbo run dev --parallel",
+    "dev:web": "turbo run dev --filter=@neuralpath/web",
+    "dev:api": "turbo run dev --filter=@neuralpath/api",
+    "build": "turbo run build",
+    "build:web": "turbo run build --filter=@neuralpath/web",
+    "build:api": "turbo run build --filter=@neuralpath/api",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.14",
-    "@types/node": "^22.15.30",
-    "@types/react": "^19.1.14",
-    "@types/react-dom": "^19.1.9",
-    "eslint": "^9.36.0",
-    "eslint-config-next": "^15.5.6",
-    "tailwindcss": "^4.1.14",
-    "typescript": "^5.9.3"
+    "turbo": "^2.5.6"
   }
 }
