@@ -92,7 +92,7 @@ const days: Day[] = topics.map((t, i) => ({
     {id:"ship",title:"Commit your progress",detail:"Push today's code and add a useful README note.",minutes:15,xp:15},
   ],
   resource: (() => { const item = resources[Math.min(i < 7 ? 0 : i < 12 ? 1 : i < 20 ? 4 : i < 25 ? 5 : i < 32 ? 6 : i < 38 ? 8 : 9, resources.length-1)]; return { label: item[0], url: item[1] }; })(),
-  video: (() => { const item = videoLinks[Math.min(i < 7 ? 0 : i < 20 ? 0 : i < 25 ? 3 : i < 32 ? 4 : i < 38 ? 5 : 6, videoLinks.length-1)]; return { label: item[0], url: item[1] }; })(),
+  video: (() => { const item = videoLinks[Math.min(i < 7 ? 0 : i < 20 ? 2 : i < 25 ? 3 : i < 32 ? 4 : i < 38 ? 5 : 6, videoLinks.length-1)]; return { label: item[0], url: item[1] }; })(),
   deliverable: i===6 ? "A CLI expense tracker with JSON persistence and clear input validation." : i===19 ? "A reproducible ML model that predicts expense categories and reports evaluation metrics." : i===24 ? "A trained PyTorch model with a saved checkpoint and a short experiment log." : i===34 ? "A document Q&A prototype that retrieves relevant chunks and cites its sources." : i===44 ? "A deployed BizDhan AI demo, architecture diagram, README, and portfolio case study." : `A small, tested ${t[0].toLowerCase()} exercise committed to your learning repository.`,
   quiz: `Can you explain ${t[0].toLowerCase()} in plain language, implement a tiny example from memory, and describe one real-world use?`
 }));
