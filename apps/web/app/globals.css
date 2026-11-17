@@ -42,3 +42,14 @@ body{background:var(--site-bg)}
 @media(max-width:650px){.auth-card{padding:26px 21px}.auth-card h1{font-size:31px}.onboarding-header{padding:0 18px}.onboarding-header>span{font-size:8px}.onboarding-wrap{padding:32px 16px 65px}.onboarding-section{padding:18px 15px}.choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.onboarding-submit{align-items:stretch;flex-direction:column}.onboarding-submit button{width:100%}}
 
 .signout-form{padding:10px 3px 0}.signout-form button{border:1px solid var(--line);background:transparent;color:#9ba8bf;border-radius:7px;padding:7px 10px;font-size:10px;width:100%;text-align:left}.signout-form button:hover{border-color:#a99aff;color:#e5deff}
+
+
+/* Learner workspace integration */
+.workspace-goals-form{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto;gap:10px;align-items:end}
+.workspace-goals-form input{min-width:0}
+.workspace-goals-submit{white-space:nowrap}
+@media(max-width:650px){
+  .workspace-goals-form{grid-template-columns:minmax(0,1fr);gap:12px}
+  .workspace-goals-submit{width:100%;min-height:44px;justify-content:center}
+  .workspace-goals-form label{min-width:0}
+}
