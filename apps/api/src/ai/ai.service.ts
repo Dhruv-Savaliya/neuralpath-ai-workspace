@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -44,6 +45,7 @@ export class AiService {
 
   async ingest(req: AuthenticatedRequest, dto: IngestKnowledgeDto) {
     const chunks = this.chunkText(dto.content);
+    if (!chunks.length) throw new BadRequestException("Knowledge content must contain readable text.");
     const embeddings: number[][] = [];
     for (let offset = 0; offset < chunks.length; offset += 8) {
       embeddings.push(...(await this.embed(chunks.slice(offset, offset + 8))));
@@ -299,15 +301,18 @@ export class AiService {
     inputChars: number,
     outputChars: number,
   ) {
-    const { error } = await req.supabase.from("ai_usage_events").insert({
-      user_id: req.user.id,
-      provider,
-      model,
-      operation,
-      input_chars: inputChars,
-      output_chars: outputChars,
-      succeeded: true,
-    });
-    if (error) return;
+    try {
+      await req.supabase.from("ai_usage_events").insert({
+        user_id: req.user.id,
+        provider,
+        model,
+        operation,
+        input_chars: inputChars,
+        output_chars: outputChars,
+        succeeded: true,
+      });
+    } catch {
+      // Telemetry failures must never make a successful AI response fail.
+    }
   }
 }
