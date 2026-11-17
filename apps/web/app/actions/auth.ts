@@ -12,7 +12,7 @@ async function getAuthRedirectBaseUrl() {
   // Trust only this app's Vercel deployment hosts and local development.
   if (
     normalizedHost === "neuralpath-ai-workspace.vercel.app" ||
-    normalizedHost.startsWith("neuralpath-ai-workspace-git-") && normalizedHost.endsWith(".vercel.app")
+    normalizedHost.startsWith("neuralpath-ai-workspace-") && normalizedHost.endsWith(".vercel.app")
   ) {
     return `https://${normalizedHost}`;
   }
