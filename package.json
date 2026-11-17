@@ -1,0 +1,22 @@
+{
+  "name": "neuralpath",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@10.9.2",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:web": "turbo run dev --filter=@neuralpath/web",
+    "dev:api": "turbo run dev --filter=@neuralpath/api",
+    "build": "turbo run build",
+    "build:web": "turbo run build --filter=@neuralpath/web",
+    "build:api": "turbo run build --filter=@neuralpath/api",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.6"
+  }
+}
