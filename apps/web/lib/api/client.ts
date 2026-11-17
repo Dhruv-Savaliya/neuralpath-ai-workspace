@@ -49,6 +49,21 @@ export type WorkspaceDashboard = {
   };
 };
 
+export type KnowledgeSource = {
+  source_id: string;
+  title: string;
+  url: string | null;
+  created_at: string;
+  chunks: number;
+};
+
+export type AiChatResponse = {
+  answer: string;
+  provider: string;
+  model: string;
+  sources: Array<{ citation: string; title: string; url: string | null; similarity: number }>;
+};
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!baseUrl) throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured.");
   const supabase = createClient();
@@ -86,4 +101,11 @@ export const neuralPathApi = {
   bootstrapPath: (goal_id: string) => request<ApiPath>("/paths/bootstrap", { method: "POST", body: JSON.stringify({ goal_id }) }),
   saveProgress: (input: { path_item_id: string; status: "in_progress" | "completed"; reflection?: string }) =>
     request<{ id: string; status: string; completed_at: string | null }>("/progress", { method: "POST", body: JSON.stringify(input) }),
+  getKnowledgeSources: () => request<KnowledgeSource[]>("/ai/knowledge"),
+  ingestKnowledge: (input: { title: string; content: string; source_url?: string }) =>
+    request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge", { method: "POST", body: JSON.stringify(input) }),
+  deleteKnowledge: (sourceId: string) =>
+    request<{ deleted: boolean; chunks_deleted: number }>(`/ai/knowledge/${sourceId}`, { method: "DELETE" }),
+  askAi: (question: string) =>
+    request<AiChatResponse>("/ai/chat", { method: "POST", body: JSON.stringify({ question }) }),
 };

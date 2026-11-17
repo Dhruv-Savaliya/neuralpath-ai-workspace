@@ -26,3 +26,20 @@ Render's free API sleeps after 15 minutes without inbound traffic. First request
 
 ## Growth warning
 Vercel Hobby is restricted to personal/non-commercial use. If NeuralPath becomes a commercial product, do not assume Vercel Hobby remains eligible. Re-evaluate a genuinely free alternative or seek user approval before any paid upgrade.
+
+## AI and embedding free-tier policy
+
+| Capability | Selected model | Cost / limit policy |
+| --- | --- | --- |
+| Generation | Gemini 3.7 Flash | Free tier listed by Google for eligible accounts; model-specific quotas apply |
+| Optional fallback | Groq GPT-OSS 120B | Paid per token; disabled by default (`GROQ_ENABLED=false`) |
+| Embeddings | Cloudflare Workers AI BGE-M3 | Workers Free includes 10,000 Neurons/day; quota exhaustion must fail closed |
+| Vector database | Supabase pgvector | Existing Supabase project; no separate vector database |
+
+Do not assume Groq GPT-OSS 120B is free. Current published rates are $0.15 per million input tokens and $0.60 per million output tokens. Keep the Groq secret stored but do not call this provider unless the user explicitly approves paid usage.
+
+Gemini 3.7 Flash has a listed free tier, while newer Gemini models may have different pricing. Pin the configured model to `gemini-3.7-flash` until pricing and eligibility are rechecked.
+
+Cloudflare BGE-M3 is listed at $0.0118 per million input tokens, metered through Workers AI Neurons. The Workers Free daily allowance is 10,000 Neurons. This is a capped free allowance, not unlimited inference. Monitor usage in Cloudflare and stop on quota errors; never upgrade the account automatically.
+
+AI provider keys must remain in Render's server-side Environment settings. Never commit secrets or expose them in browser variables. Avoid sending private credentials or sensitive personal information to free-tier AI providers.
