@@ -1,6 +1,7 @@
 begin;
 
 create extension if not exists vector with schema extensions;
+grant usage on schema extensions to authenticated;
 
 create table if not exists public.knowledge_chunks (
   id uuid primary key default gen_random_uuid(),
