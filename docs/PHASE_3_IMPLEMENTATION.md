@@ -1,26 +1,39 @@
-# Phase 3 — Personalized workspace
+# Phase 3 — Personalized workspace API
 
-## Architecture
-Phase 3 adds a dedicated NestJS API under apps/api. Next.js remains presentation, Supabase Auth remains identity, and Supabase Postgres remains the source of truth. The API verifies Supabase access tokens and uses the same user JWT for database calls so RLS is preserved. No service-role credential is required for normal learner requests.
+## Monorepo structure
+This repository uses npm workspaces and Turborepo:
+- `apps/web`: Next.js frontend.
+- `apps/api`: NestJS backend.
+- `supabase/migrations`: PostgreSQL schema.
+- `render.yaml`: Render Free API blueprint.
 
-## Implemented foundation
-- NestJS 11 service with TypeScript build configuration and versioned /api/v1 prefix.
-- Supabase bearer-token verification guard and user-scoped database client.
-- Dashboard aggregation for profile, goals, paths, path items and progress.
-- Profile read/update endpoints with allowlisted DTO.
-- Goal list/create/update/delete endpoints.
-- Progress upsert endpoint.
-- DTO validation, unknown-field rejection, Helmet, exact-origin CORS, throttling.
-- Health endpoint and local/deployment instructions.
+## Implemented
+- Separate NestJS service with `/api/v1` prefix and health endpoint.
+- Supabase access-token validation; the API passes the user's JWT to Postgres so RLS remains active.
+- Dashboard aggregation, profile read/update, learning-goal CRUD, progress upsert.
+- DTO validation, Helmet, CORS and throttling.
+- Typed frontend API client.
+- npm workspace scripts and Turborepo task graph.
+- Render free-service blueprint and GitHub Actions validation.
 
-## Remaining Phase 3 work
-1. Deploy NestJS service and configure its production origin.
-2. Add typed Next.js API client forwarding the signed-in user's access token.
-3. Wire the typed Next.js API client into the dashboard and replace local-only progress with server-backed progress.
-4. Add path and path-item authoring/generation flows so goals become persisted learning plans.
-5. Add projects, resources, assessments, reflections and weekly analytics.
-6. Add integration tests for authentication, owner isolation and progress persistence.
-7. Complete mobile/desktop QA and verify both deployments.
+## Not yet complete
+- Connect dashboard screens to the API client and remove local-only progress paths.
+- Persist learning path and path-item creation/updates.
+- Add project, resource and assessment workflows.
+- Add integration tests proving user isolation and progress persistence.
+- Deploy Render service, configure exact CORS origin, set Vercel API origin, and test both services together.
+- Confirm the existing Supabase migration is applied and verify schema against service queries.
 
-## Environment
-API variables: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, WEB_ORIGINS and PORT. Web frontend will use a public API origin only after deployment. No service-role key or AI provider secret is needed for this phase.
+## Local commands
+```bash
+npm install
+npm run dev
+npm run dev:web
+npm run dev:api
+npm run lint
+npm run typecheck
+npm run build
+```
+
+## Free deployment
+Vercel Hobby frontend (personal/non-commercial use only), Render Free NestJS web service, Supabase Free Auth/Postgres. Read `docs/FREE_TIER_ARCHITECTURE.md` for quotas and limitations. No paid plan is authorized by this project plan.
