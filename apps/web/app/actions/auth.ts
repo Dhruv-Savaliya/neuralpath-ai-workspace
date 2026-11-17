@@ -1,7 +1,28 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "../../lib/supabase/server";
+
+async function getAuthRedirectBaseUrl() {
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "";
+  const normalizedHost = host.split(",")[0].trim().toLowerCase();
+
+  // Trust only this app's Vercel deployment hosts and local development.
+  if (
+    normalizedHost === "neuralpath-ai-workspace.vercel.app" ||
+    normalizedHost.startsWith("neuralpath-ai-workspace-git-") && normalizedHost.endsWith(".vercel.app")
+  ) {
+    return `https://${normalizedHost}`;
+  }
+
+  if (normalizedHost === "localhost:3000" || normalizedHost === "127.0.0.1:3000") {
+    return `http://${normalizedHost}`;
+  }
+
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://neuralpath-ai-workspace.vercel.app").replace(/\/$/, "");
+}
 
 function safeNext(value: FormDataEntryValue | null) {
   const path = typeof value === "string" ? value : "";
@@ -12,14 +33,15 @@ export async function signUp(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const displayName = String(formData.get("display_name") ?? "").trim().slice(0, 80);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 128) {
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || password.length < 8 || password.length > 128) {
     redirect("/auth/sign-up?error=invalid_input");
   }
   const supabase = await createClient();
+  const redirectBaseUrl = await getAuthRedirectBaseUrl();
   const { error } = await supabase.auth.signUp({
     email, password, options: {
       data: { display_name: displayName },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/auth/callback?next=/onboarding`,
+      emailRedirectTo: `${redirectBaseUrl}/auth/callback?next=/onboarding`,
     },
   });
   if (error) redirect("/auth/sign-up?error=signup_failed");
@@ -30,7 +52,7 @@ export async function signIn(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const next = safeNext(formData.get("next"));
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password || password.length > 128) {
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || !password || password.length > 128) {
     redirect("/auth/sign-in?error=invalid_input");
   }
   const supabase = await createClient();
@@ -69,7 +91,7 @@ export async function saveOnboarding(formData: FormData) {
     category:(categories[i] ?? "general").trim().slice(0,60),
     desired_outcome:(outcomes[i] ?? "").trim().slice(0,1000),
     current_level:levels.includes(goalLevels[i])?goalLevels[i]:level,
-    target_date:/^\d{4}-\d{2}-\d{2}$/.test(dates[i] ?? "")?dates[i]:null,
+    target_date:/^\\d{4}-\\d{2}-\\d{2}$/.test(dates[i] ?? "")?dates[i]:null,
   })).filter(g=>g.title.length>=3).slice(0,10);
 
   if (!professions.includes(p) || !levels.includes(level) || !["relaxed","balanced","intensive"].includes(pace) ||
