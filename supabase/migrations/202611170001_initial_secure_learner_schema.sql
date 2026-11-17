@@ -219,6 +219,9 @@ begin
     or p_weekly_minutes not between 15 and 3000
     or coalesce(array_length(p_interests,1),0) not between 1 and 20
     or coalesce(array_length(p_learning_formats,1),0)>10
+    or exists(select 1 from unnest(coalesce(p_interests,'{}'::text[])) as x where char_length(x) not between 1 and 40)
+    or exists(select 1 from unnest(coalesce(p_learning_formats,'{}'::text[])) as x where x not in ('reading','video','hands_on_projects','exercises','audio','guided_explanations'))
+    or char_length(coalesce(p_timezone,'Asia/Kolkata'))>80
     or jsonb_typeof(p_goals)<>'array'
     or jsonb_array_length(p_goals) not between 1 and 10
   then raise exception 'invalid onboarding data' using errcode='22023'; end if;
