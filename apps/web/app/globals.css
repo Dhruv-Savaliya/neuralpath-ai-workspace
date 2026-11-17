@@ -53,3 +53,17 @@ body{background:var(--site-bg)}
   .workspace-goals-submit{width:100%;min-height:44px;justify-content:center}
   .workspace-goals-form label{min-width:0}
 }
+
+
+/* Phase 4 learner profile and goal controls */
+.workspace-profile-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.workspace-profile-form label,.workspace-goals-edit{display:grid;gap:6px;font-size:13px;min-width:0}
+.workspace-profile-form input,.workspace-profile-form select,.workspace-goals-edit input{width:100%;min-width:0;padding:11px 12px;border-radius:9px;border:1px solid var(--border,#374151);background:transparent;color:inherit}
+.workspace-goal-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
+.workspace-goal-actions button{display:inline-flex;align-items:center;gap:6px}
+.workspace-goals-edit{grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto auto;align-items:end}
+@media(max-width:650px){
+ .workspace-profile-form{grid-template-columns:minmax(0,1fr)}
+ .workspace-goals-edit{grid-template-columns:minmax(0,1fr)}
+ .workspace-goal-actions{gap:8px}
+}
