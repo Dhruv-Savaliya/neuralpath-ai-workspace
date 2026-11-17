@@ -20,7 +20,7 @@ create table if not exists public.knowledge_chunks (
 create index if not exists knowledge_chunks_owner_source_idx
   on public.knowledge_chunks(user_id, source_id);
 create index if not exists knowledge_chunks_embedding_hnsw_idx
-  on public.knowledge_chunks using hnsw (embedding vector_cosine_ops);
+  on public.knowledge_chunks using hnsw (embedding extensions.vector_cosine_ops);
 
 alter table public.knowledge_chunks enable row level security;
 revoke all on public.knowledge_chunks from anon, authenticated;
