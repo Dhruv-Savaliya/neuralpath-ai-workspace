@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { signOut } from "../actions/auth";
 import WorkspaceGoalsPanel from "./workspace-goals";
+import WorkspaceProfilePanel from "./workspace-profile";
+import { neuralPathApi, type ApiPathItem } from "../../lib/api/client";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity, ArrowUpRight, Award, BookOpen, BrainCircuit, CalendarDays, Check,
@@ -114,6 +116,8 @@ export default function Home() {
   const [quizAnswer,setQuizAnswer] = useState("");
   const [toast,setToast] = useState("");
   const [hydrated,setHydrated] = useState(false);
+  const [pathItems,setPathItems] = useState<ApiPathItem[]>([]);
+  const [cloudReady,setCloudReady] = useState(false);
   useEffect(() => {
     try {
       const raw = localStorage.getItem("neuralpath-progress-v1");
@@ -122,6 +126,45 @@ export default function Home() {
     setHydrated(true);
   },[]);
   useEffect(() => { if(hydrated) localStorage.setItem("neuralpath-progress-v1",JSON.stringify({completed,checked,xp,streak,lastActive,activeDay})); },[completed,checked,xp,streak,lastActive,activeDay,hydrated]);
+  useEffect(() => {
+    if (!hydrated) return;
+    let active = true;
+    (async () => {
+      try {
+        let dashboard = await neuralPathApi.getDashboard();
+        let selectedPath = dashboard.paths.find(path => path.status === "active") ?? dashboard.paths[0];
+        if (!selectedPath && dashboard.goals.length) {
+          selectedPath = await neuralPathApi.bootstrapPath(dashboard.goals.find(goal => goal.status === "active")?.id ?? dashboard.goals[0].id);
+          dashboard = await neuralPathApi.getDashboard();
+          selectedPath = dashboard.paths.find(path => path.id === selectedPath?.id) ?? dashboard.paths[0];
+        }
+        if (!active || !selectedPath) { if(active) setCloudReady(true); return; }
+        const items = selectedPath.items ?? [];
+        const nextChecked: Record<string,boolean> = {};
+        const nextCompleted: number[] = [];
+        for (const item of items) {
+          const dayNumber = Math.floor(item.position / 4) + 1;
+          const taskId = ["learn","code","notes","ship"][item.position % 4];
+          if (item.progress === "completed" && dayNumber >= 1 && dayNumber <= 45) nextChecked[`${dayNumber}-${taskId}`] = true;
+        }
+        for (let dayNumber=1; dayNumber<=45; dayNumber++) {
+          if (["learn","code","notes","ship"].every(taskId=>nextChecked[`${dayNumber}-${taskId}`])) nextCompleted.push(dayNumber);
+        }
+        const earnedXp = Object.keys(nextChecked).reduce((sum,key)=>{
+          const taskId = key.split("-")[1];
+          return sum + ({learn:20,code:35,notes:10,ship:15} as Record<string,number>)[taskId];
+        },0) + nextCompleted.length*50;
+        setPathItems(items);
+        setChecked(nextChecked);
+        setCompleted(nextCompleted);
+        setXp(earnedXp);
+        setCloudReady(true);
+      } catch (cause) {
+        if (active) { setCloudReady(false); notify(cause instanceof Error ? cause.message : "Cloud progress could not be loaded."); }
+      }
+    })();
+    return () => { active = false; };
+  },[hydrated]);
   const day = days[activeDay-1];
   const doneTasks = day.tasks.filter(t=>checked[`${activeDay}-${t.id}`]).length;
   const progress = Math.round(completed.length/45*100);
@@ -129,11 +172,22 @@ export default function Home() {
   const xpInLevel = xp%250;
   const nextDay = completed.length ? Math.min(45,Math.max(...completed)+1) : 1;
   const notify = (s:string) => { setToast(s); window.setTimeout(()=>setToast(""),2600); };
-  function toggleTask(id:string) {
-    const key=`${activeDay}-${id}`, was=!!checked[key];
+  async function toggleTask(id:string) {
+    const key=`${activeDay}-${id}`, was=!!checked[key], task=day.tasks.find(t=>t.id===id)!;
+    const itemPosition=(activeDay-1)*4+["learn","code","notes","ship"].indexOf(id);
+    const item=pathItems.find(candidate=>candidate.position===itemPosition);
+    if (!item) { notify("Your cloud learning path is still being prepared. Refresh and try again."); return; }
     setChecked(v=>({...v,[key]:!was}));
-    if(!was) { const task=day.tasks.find(t=>t.id===id)!; setXp(v=>v+task.xp); const d=todayKey(); if(lastActive!==d){setStreak(v=>v+1);setLastActive(d);} notify(`+${task.xp} XP earned. Nice work!`); }
-    else { const task=day.tasks.find(t=>t.id===id)!; setXp(v=>Math.max(0,v-task.xp)); notify("Task unchecked. XP adjusted."); }
+    if(!was) { setXp(v=>v+task.xp); const d=todayKey(); if(lastActive!==d){setStreak(v=>v+1);setLastActive(d);} notify(`+${task.xp} XP earned. Saving to your account…`); }
+    else { setXp(v=>Math.max(0,v-task.xp)); notify("Task unchecked. Saving your update…"); }
+    try {
+      await neuralPathApi.saveProgress({path_item_id:item.id,status:was?"in_progress":"completed"});
+      notify(was?"Progress updated in your account.":"Progress saved to your account.");
+    } catch(cause) {
+      setChecked(v=>({...v,[key]:was}));
+      setXp(v=>Math.max(0,v+(was?task.xp:-task.xp)));
+      notify(cause instanceof Error?cause.message:"Unable to save progress. Please retry.");
+    }
   }
   function finishDay() {
     if(doneTasks<day.tasks.length){notify("Complete all daily tasks before claiming the day.");return;}
@@ -164,7 +218,7 @@ export default function Home() {
     <section className="main-area">
       <header className="topbar"><div className="top-left"><button className="mobile-menu" onClick={()=>setMenuOpen(true)}><Menu size={20}/></button><div className="breadcrumb">Workspace <ChevronRight size={14}/> <b>{nav.find(n=>n.id===tab)?.label}</b></div></div><div className="top-actions"><div className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}</div><div className="xp-chip"><Zap size={15}/><b>{xp.toLocaleString()}</b><span>XP</span></div><div className="avatar top-avatar">DS</div></div></header>
       <div className="page-content">
-        {tab === "overview" && <WorkspaceGoalsPanel />}
+        {tab === "overview" && <><WorkspaceGoalsPanel /><WorkspaceProfilePanel /></>}
         {tab==="overview"&&<AnimatePresence mode="wait"><motion.div key="overview" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:.25}}>
           <div className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-dot"/> YOUR PERSONAL AI BUILD SPACE</div><h1>Build your future in <span>AI.</span></h1><p className="subhead">Small steps. Real projects. Skills that compound. Let&apos;s make today count.</p></div><div className="date-note"><span>YOUR NEXT SESSION</span><b>Day {nextDay} <span>of 45</span></b><small>{days[nextDay-1].title}</small></div></div>
           <div className="hero-card"><div className="hero-grid"/><div className="hero-content"><div className="hero-kicker"><Sparkles size={14}/> TODAY&apos;S FOCUS · DAY {activeDay.toString().padStart(2,"0")}</div><h2>{day.title}</h2><p>{day.focus}. Build understanding by doing, not just watching.</p><div className="hero-meta"><span><Clock3 size={14}/> 2–3 hours</span><span><Target size={14}/> 4 focused tasks</span><span><Zap size={14}/> Up to 130 XP</span></div><button className="primary-btn" onClick={()=>setTab("roadmap")}>Open today&apos;s plan <ArrowUpRight size={16}/></button></div><div className="hero-art"><div className="orb orb-one"/><div className="orb orb-two"/><div className="orbit orbit-a"/><div className="orbit orbit-b"/><div className="core"><BrainCircuit size={46}/></div><div className="float-tag tag-top"><Code2 size={14}/> BUILD</div><div className="float-tag tag-bottom"><Sparkles size={14}/> EVOLVE</div></div></div>
@@ -179,7 +233,7 @@ export default function Home() {
         <footer className="footer"><span>NEURALPATH <i>·</i> BUILT FOR THE LONG GAME</span><span>Learn with intent. Build with care. Ship with confidence.</span></footer>
       </div>
     </section>
-    <AnimatePresence>{showQuiz&&<motion.div className="modal-backdrop" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>setShowQuiz(false)}><motion.div className="quiz-modal" initial={{y:20,scale:.97}} animate={{y:0,scale:1}} exit={{y:15,scale:.98}} onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowQuiz(false)}><X size={18}/></button><div className="quiz-label"><CircleHelp size={16}/> KNOWLEDGE CHECK</div><h2>Can you teach it back?</h2><p>{day.quiz}</p><textarea value={quizAnswer} onChange={e=>setQuizAnswer(e.target.value)} placeholder="Write a short answer in your own words..." rows={4}/><button className="primary-btn full-btn" onClick={()=>{if(quizAnswer.trim().length<20){notify("Write at least a couple of sentences to reflect.");return;}setXp(v=>v+10);setShowQuiz(false);setQuizAnswer("");notify("Reflection saved locally. +10 XP!");}}>Save reflection <Check size={15}/></button><small className="modal-hint">Your answer stays in this browser session only; it is not sent to a server.</small></motion.div></motion.div>}</AnimatePresence>
+    <AnimatePresence>{showQuiz&&<motion.div className="modal-backdrop" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>setShowQuiz(false)}><motion.div className="quiz-modal" initial={{y:20,scale:.97}} animate={{y:0,scale:1}} exit={{y:15,scale:.98}} onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowQuiz(false)}><X size={18}/></button><div className="quiz-label"><CircleHelp size={16}/> KNOWLEDGE CHECK</div><h2>Can you teach it back?</h2><p>{day.quiz}</p><textarea value={quizAnswer} onChange={e=>setQuizAnswer(e.target.value)} placeholder="Write a short answer in your own words..." rows={4}/><button className="primary-btn full-btn" onClick={async ()=>{if(quizAnswer.trim().length<20){notify("Write at least a couple of sentences to reflect.");return;}const item=pathItems.find(candidate=>candidate.position===(activeDay-1)*4);if(!item){notify("Your cloud learning path is not ready yet.");return;}try{await neuralPathApi.saveProgress({path_item_id:item.id,status:checked[`${activeDay}-learn`]?"completed":"in_progress",reflection:quizAnswer.trim()});setXp(v=>v+10);setShowQuiz(false);setQuizAnswer("");notify("Reflection saved to your account. +10 XP!");}catch(cause){notify(cause instanceof Error?cause.message:"Unable to save reflection.");}}}>Save reflection <Check size={15}/></button><small className="modal-hint">Your reflection is saved with your learning progress.</small></motion.div></motion.div>}</AnimatePresence>
     <AnimatePresence>{toast&&<motion.div className="toast" initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} exit={{opacity:0,y:10}}><CheckCircle2 size={17}/>{toast}</motion.div>}</AnimatePresence>
   </main>;
 }
