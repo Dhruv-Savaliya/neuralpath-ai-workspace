@@ -84,6 +84,23 @@ export class AiService {
     };
   }
 
+  async deleteKnowledge(req: AuthenticatedRequest, sourceId: string) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sourceId)) {
+      throw new NotFoundException("Knowledge source was not found.");
+    }
+
+    const { data, error } = await req.supabase
+      .from("knowledge_chunks")
+      .delete()
+      .eq("source_id", sourceId)
+      .eq("user_id", req.user.id)
+      .select("id");
+
+    if (error) throw new InternalServerErrorException("Unable to delete the knowledge source.");
+    if (!data?.length) throw new NotFoundException("Knowledge source was not found.");
+    return { deleted: true, chunks_deleted: data.length };
+  }
+
   async chat(req: AuthenticatedRequest, dto: ChatDto) {
     const question = dto.question.trim();
     const [queryEmbedding] = await this.embed([question]);
