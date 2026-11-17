@@ -83,6 +83,36 @@ export class AiService {
     };
   }
 
+  async listKnowledge(req: AuthenticatedRequest) {
+    const { data, error } = await req.supabase
+      .from("knowledge_chunks")
+      .select("source_id,source_title,source_url,created_at")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    if (error) throw new InternalServerErrorException("Unable to load knowledge sources.");
+
+    const grouped = new Map<string, {
+      source_id: string;
+      title: string;
+      url: string | null;
+      created_at: string;
+      chunks: number;
+    }>();
+    for (const row of data ?? []) {
+      const current = grouped.get(row.source_id);
+      if (current) current.chunks += 1;
+      else grouped.set(row.source_id, {
+        source_id: row.source_id,
+        title: row.source_title,
+        url: row.source_url,
+        created_at: row.created_at,
+        chunks: 1,
+      });
+    }
+    return Array.from(grouped.values());
+  }
+
   async deleteKnowledge(req: AuthenticatedRequest, sourceId: string) {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sourceId)) {
       throw new NotFoundException("Knowledge source was not found.");
