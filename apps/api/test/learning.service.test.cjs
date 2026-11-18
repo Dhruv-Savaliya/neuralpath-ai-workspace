@@ -21,7 +21,7 @@ function makeDb(responses) {
         insert(value) { this.operation = "insert"; this.value = value; return this; },
         update(value) { this.operation = "update"; this.value = value; return this; },
         maybeSingle: async () => responses[table] ?? { data: null, error: null },
-        single: async () => responses[table] ?? { data: { id: "saved-recommendation" }, error: null },
+        single: async () => this.operation === "insert" ? { data: { id: "saved-recommendation" }, error: null } : (responses[table] ?? { data: { id: "saved-recommendation" }, error: null }),
         then(resolve, reject) { return Promise.resolve(responses[table] ?? { data: [], error: null }).then(resolve, reject); },
       };
       return query;
