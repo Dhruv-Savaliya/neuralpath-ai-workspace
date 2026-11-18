@@ -1,0 +1,100 @@
+[
+  {
+    "name": "grounded-next-task",
+    "candidates": [
+      {
+        "candidateId": "task:00000000-0000-4000-8000-000000000001",
+        "kind": "focus_task",
+        "taskId": "00000000-0000-4000-8000-000000000001",
+        "goalId": null,
+        "title": "Continue Python",
+        "actionValue": null,
+        "estimatedMinutes": 45
+      },
+      {
+        "candidateId": "task:00000000-0000-4000-8000-000000000002",
+        "kind": "focus_task",
+        "taskId": "00000000-0000-4000-8000-000000000002",
+        "goalId": null,
+        "title": "Practice loops",
+        "actionValue": null,
+        "estimatedMinutes": 45
+      }
+    ],
+    "output": {
+      "recommendations": [
+        {
+          "candidateId": "task:00000000-0000-4000-8000-000000000002",
+          "reason": "This is the next saved task.",
+          "priority": 1
+        }
+      ]
+    },
+    "expectedCandidateIds": [
+      "task:00000000-0000-4000-8000-000000000002"
+    ]
+  },
+  {
+    "name": "reject-invented-task-id",
+    "candidates": [
+      {
+        "candidateId": "task:00000000-0000-4000-8000-000000000001",
+        "kind": "focus_task",
+        "taskId": "00000000-0000-4000-8000-000000000001",
+        "goalId": null,
+        "title": "Continue Python",
+        "actionValue": null,
+        "estimatedMinutes": 45
+      }
+    ],
+    "output": {
+      "recommendations": [
+        {
+          "candidateId": "task:00000000-0000-4000-8000-000000000099",
+          "reason": "This task was invented.",
+          "priority": 1
+        }
+      ]
+    },
+    "expectedCandidateIds": []
+  },
+  {
+    "name": "deduplicate-repeated-candidates",
+    "candidates": [
+      {
+        "candidateId": "task:00000000-0000-4000-8000-000000000001",
+        "kind": "focus_task",
+        "taskId": "00000000-0000-4000-8000-000000000001",
+        "goalId": null,
+        "title": "Continue Python",
+        "actionValue": null,
+        "estimatedMinutes": 45
+      }
+    ],
+    "output": {
+      "recommendations": [
+        {
+          "candidateId": "task:00000000-0000-4000-8000-000000000001",
+          "reason": "Continue the next task.",
+          "priority": 1
+        },
+        {
+          "candidateId": "task:00000000-0000-4000-8000-000000000001",
+          "reason": "Duplicate task.",
+          "priority": 2
+        }
+      ]
+    },
+    "expectedCandidateIds": [
+      "task:00000000-0000-4000-8000-000000000001"
+    ]
+  },
+  {
+    "name": "reject-malformed-model-payload",
+    "candidates": [],
+    "output": {
+      "recommendations": "not-an-array"
+    },
+    "expectedCandidateIds": []
+  }
+]

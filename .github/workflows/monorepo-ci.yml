@@ -13,12 +13,18 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
+          package-manager-cache: false
       - name: Install workspace dependencies
         run: npm install
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Audit development dependencies (non-blocking)
+        continue-on-error: true
+        run: npm audit --audit-level=high
       - name: Lint
         run: npm run lint
       - name: Typecheck

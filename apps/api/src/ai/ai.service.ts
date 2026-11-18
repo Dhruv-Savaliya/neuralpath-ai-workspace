@@ -183,6 +183,29 @@ export class AiService {
     };
   }
 
+  async generateForLearning(req: AuthenticatedRequest, prompt: string) {
+    if (prompt.length > 12000) {
+      throw new BadRequestException("Learning context is too large to process.");
+    }
+    const startedAt = Date.now();
+    const geminiModel = this.config.get<string>("GEMINI_MODEL") ?? "gemini-3.8-flash";
+    const groqModel = this.config.get<string>("GROQ_MODEL") ?? "openai/gpt-oss-120b";
+    try {
+      const generated = await this.generate(prompt);
+      await this.recordUsage(
+        req, generated.provider, generated.model, "generation",
+        prompt.length, generated.answer.length, Date.now() - startedAt, true,
+      );
+      return generated;
+    } catch (error) {
+      await this.recordUsage(
+        req, "generation_chain", `${geminiModel}+${groqModel}`, "generation",
+        prompt.length, 0, Date.now() - startedAt, false, "provider_unavailable",
+      );
+      throw error;
+    }
+  }
+
   private chunkText(input: string): string[] {
     const normalized = input.replace(/\r\n/g, "\n").replace(/[\t ]+/g, " ").trim();
     const chunks: string[] = [];
@@ -247,7 +270,7 @@ export class AiService {
 
   private async generate(prompt: string): Promise<{ answer: string; provider: string; model: string }> {
     const geminiKey = this.config.get<string>("GEMINI_API_KEY");
-    const geminiModel = this.config.get<string>("GEMINI_MODEL") ?? "gemini-3.7-flash";
+    const geminiModel = this.config.get<string>("GEMINI_MODEL") ?? "gemini-3.8-flash";
     if (!geminiKey) throw new ServiceUnavailableException("Gemini API credentials are not configured.");
 
     try {
@@ -257,10 +280,10 @@ export class AiService {
       if (!(error instanceof ProviderError) || !error.isTransient) {
         throw new ServiceUnavailableException("Gemini generation failed. Check model availability and API configuration.");
       }
-      const groqEnabled = this.config.get<string>("GROQ_ENABLED") === "true";
+      const groqEnabled = this.config.get<string>("GROQ_ENABLED") !== "false";
       const groqKey = this.config.get<string>("GROQ_API_KEY");
       if (!groqEnabled || !groqKey) {
-        throw new ServiceUnavailableException("Gemini is temporarily unavailable. Groq fallback is disabled to prevent unexpected API charges.");
+        throw new ServiceUnavailableException("Gemini is temporarily unavailable. Configure GROQ_API_KEY and enable Groq fallback to continue.");
       }
       const groqModel = this.config.get<string>("GROQ_MODEL") ?? "openai/gpt-oss-120b";
       try {
@@ -333,6 +356,9 @@ export class AiService {
     operation: "embedding" | "generation",
     inputChars: number,
     outputChars: number,
+    latencyMs?: number,
+    succeeded = true,
+    errorCode?: string,
   ) {
     try {
       await req.supabase.from("ai_usage_events").insert({
@@ -342,7 +368,9 @@ export class AiService {
         operation,
         input_chars: inputChars,
         output_chars: outputChars,
-        succeeded: true,
+        latency_ms: latencyMs ?? null,
+        succeeded,
+        error_code: errorCode ?? null,
       });
     } catch {
       // Telemetry failures must never make a successful AI response fail.
