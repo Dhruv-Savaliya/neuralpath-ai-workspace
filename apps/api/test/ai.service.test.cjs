@@ -162,3 +162,54 @@ test("Gemini failure preserves provider reason when Groq is disabled", async () 
     global.fetch = originalFetch;
   }
 });
+
+
+test("Cloudflare BGE-M3 embeddings validate batch size and 1024 dimensions", async () => {
+  const originalFetch = global.fetch;
+  const vector = Array.from({ length: 1024 }, (_, index) => index / 1024);
+  let requestBody;
+  global.fetch = async (_url, init) => {
+    requestBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({ success: true, result: { data: [vector, vector] } }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    const config = { get(key) {
+      return ({
+        CLOUDFLARE_ACCOUNT_ID: "test-account",
+        CLOUDFLARE_API_TOKEN: "test-token",
+        CLOUDFLARE_EMBEDDING_MODEL: "@cf/baai/bge-m3",
+        EMBEDDING_DIMENSIONS: "1024",
+      })[key];
+    }};
+    const service = new AiService(config);
+    const result = await service.embed(["first sample text", "second sample text"]);
+    assert.deepEqual(requestBody.text, ["first sample text", "second sample text"]);
+    assert.equal(result.length, 2);
+    assert.equal(result[0].length, 1024);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("Cloudflare BGE-M3 rejects vectors with dimensions that differ from the database schema", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => new Response(JSON.stringify({
+    success: true, result: { data: [[0.1, 0.2, 0.3]] },
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  try {
+    const config = { get(key) {
+      return ({
+        CLOUDFLARE_ACCOUNT_ID: "test-account",
+        CLOUDFLARE_API_TOKEN: "test-token",
+        CLOUDFLARE_EMBEDDING_MODEL: "@cf/baai/bge-m3",
+        EMBEDDING_DIMENSIONS: "1024",
+      })[key];
+    }};
+    const service = new AiService(config);
+    await assert.rejects(() => service.embed(["sample text"]), /dimensions did not match vector\(1024\)/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
