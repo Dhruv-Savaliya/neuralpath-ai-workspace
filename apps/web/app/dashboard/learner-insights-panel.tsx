@@ -202,7 +202,7 @@ export default function LearnerInsightsPanel() {
               <Target size={15}/> Adaptive recommendations
             </b>
             <small style={{ display: "block", color: "var(--muted,#9ca3af)", margin: "4px 0 10px" }}>
-              {recommendations?.source === "gemini" ? "AI-ranked using your saved learning context." : "Grounded suggestions from your saved roadmap. AI may be unavailable."}
+              {recommendations?.source !== "deterministic" ? "AI-ranked using your saved learning context." : "Grounded suggestions from your saved roadmap. AI may be unavailable."}
             </small>
             {recommendations?.recommendations?.length ? recommendations.recommendations.map(item => (
               <div key={item.candidateId} style={{ border: "1px solid var(--border,rgba(148,163,184,.18))", borderRadius: 10, padding: 12, marginTop: 8 }}>
