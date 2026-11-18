@@ -62,7 +62,10 @@ export class PathsService {
         preferredDays: preferences?.preferred_days ?? [],
       },
     });
-    if (!profile?.onboarding_completed) {\n      throw new BadRequestException("Complete your onboarding profile before generating a personalized learning path.");\n    }\n    const days: GeneratedDay[] = [];
+    if (!profile?.onboarding_completed) {
+      throw new BadRequestException("Complete your onboarding profile before generating a personalized learning path.");
+    }
+    const days: GeneratedDay[] = [];
 
     // Small independently validated batches keep responses well below provider output limits.
     for (let startDay = 1; startDay <= TOTAL_DAYS; startDay += DAYS_PER_BATCH) {
