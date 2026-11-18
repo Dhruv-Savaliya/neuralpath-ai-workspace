@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { signOut } from "../actions/auth";
 import WorkspaceGoalsPanel from "./workspace-goals";
 import WorkspaceProfilePanel from "./workspace-profile";
@@ -178,7 +178,7 @@ export default function Home() {
     title: dayItems[0].description.split(" — ")[0] || baseDay.title,
     tasks: baseDay.tasks.map((task, index) => ({
       ...task,
-      title: dayItems[index].title.replace(/^Day \\d+: /, ""),
+      title: dayItems[index].title.replace(/^Day \d+: /, ""),
       detail: dayItems[index].description.split(" — ").slice(1).join(" — ") || task.detail,
     })),
   } : baseDay;
