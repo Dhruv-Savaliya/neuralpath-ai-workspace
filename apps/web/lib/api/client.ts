@@ -97,6 +97,24 @@ export type LearnerInsights = {
   emptyState: { needsGoal: boolean; needsRoadmap: boolean; needsProgress: boolean };
 };
 
+export type LearningRecommendation = {
+  candidateId: string;
+  kind: "focus_task" | "adjust_weekly_minutes";
+  taskId: string | null;
+  goalId: string | null;
+  title: string;
+  actionValue: number | null;
+  estimatedMinutes: number;
+  reason: string;
+  priority: number;
+};
+export type LearningRecommendations = {
+  id?: string;
+  source: "gemini" | "deterministic";
+  recommendations: LearningRecommendation[];
+  message?: string;
+};
+
 export type KnowledgeSource = {
   source_id: string;
   title: string;
@@ -138,6 +156,9 @@ export const neuralPathApi = {
   isConfigured: Boolean(baseUrl),
   getDashboard: () => request<WorkspaceDashboard>("/dashboard"),
   getLearnerInsights: () => request<LearnerInsights>("/learning/insights"),
+  getLearningRecommendations: () => request<LearningRecommendations>("/learning/recommendations"),
+  sendRecommendationFeedback: (id: string, feedback: "helpful" | "dismissed") => request<{ saved: boolean }>(`/learning/recommendations/${id}/feedback`, { method: "POST", body: JSON.stringify({ feedback }) }),
+  acceptLearningRecommendation: (id: string, candidateId: string) => request<{ accepted: boolean }>(`/learning/recommendations/${id}/accept`, { method: "POST", body: JSON.stringify({ candidateId }) }),
   getGoals: () => request<ApiGoal[]>("/goals"),
   getProfile: () => request<{ id: string; display_name: string; profession: string; experience_level: string; interests: string[]; timezone: string }>("/profile"),
   updateProfile: (input: { display_name?: string; profession?: string; experience_level?: string; interests?: string[]; timezone?: string }) =>
