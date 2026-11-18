@@ -55,7 +55,7 @@ test("curriculum parser rejects missing days, task counts, invalid types and out
 
   const invalidType = batch();
   invalidType.days[0].tasks[0].item_type = "video";
-  assert.throws(() => parser().parseCurriculumBatch(JSON.stringify(invalidType), 1, 5), /invalid task/);
+  assert.throws(() => parser().parseCurriculumBatch(JSON.stringify(invalidType), 1, 5), /invalid or duplicate task type/);
 
   const outOfOrder = batch();
   outOfOrder.days[0].day = 2;
