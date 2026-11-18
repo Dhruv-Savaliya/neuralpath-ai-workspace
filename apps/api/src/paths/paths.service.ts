@@ -1,76 +1,95 @@
-import { ConflictException, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import type { AuthenticatedRequest } from "../common/authenticated-request";
 import type { BootstrapPathDto } from "./dto/bootstrap-path.dto";
+import { AiService } from "../ai/ai.service";
 
-const topics = [
-  "Python setup & syntax","Control flow","Core collections","Functions","OOP essentials","Files & exceptions","Python mini-project",
-  "Linear algebra essentials","Statistics & probability","NumPy","Pandas","Data visualization",
-  "ML workflow","Regression","Classification","Model evaluation","Preprocessing","Tree models","Unsupervised learning","ML mini-project",
-  "Neural network concepts","PyTorch tensors","Build a neural network","Training loop","Deep learning mini-project",
-  "NLP foundations","Transformers","LLM APIs","Prompt engineering","Embeddings","Vector databases","RAG fundamentals",
-  "AI service with FastAPI","LangChain or LlamaIndex","Build a RAG assistant","Tool calling & agents","Persist AI app data",
-  "Docker fundamentals","AI app integration","Capstone planning","BizDhan AI: ingestion","BizDhan AI: intelligence","BizDhan AI: RAG assistant",
-  "Quality & evaluation","Deployment, observability & portfolio launch",
-];
-const taskTemplates = [
-  { title:"Learn the core concept", description:"Study the topic and write a short explanation in your own words.", item_type:"lesson" },
-  { title:"Code without copying", description:"Create a small working example and test at least two edge cases.", item_type:"exercise" },
-  { title:"Make concise notes", description:"Write three takeaways and one question you still have.", item_type:"resource" },
-  { title:"Commit your progress", description:"Push today's code and add a useful README note.", item_type:"project" },
-];
+type GeneratedTask = { title: string; description: string; item_type: "lesson" | "exercise" | "resource" | "project" };
+type GeneratedDay = { day: number; title: string; focus: string; tasks: GeneratedTask[] };
+type GeneratedCurriculum = { title: string; description: string; days: GeneratedDay[] };
 
 @Injectable()
 export class PathsService {
+  constructor(private readonly ai: AiService) {}
+
   async bootstrap(req: AuthenticatedRequest, dto: BootstrapPathDto) {
     const userId = req.user.id;
     const db = req.supabase;
-    const { data: goal, error: goalError } = await db.from("learning_goals").select("id,title").eq("id",dto.goal_id).eq("user_id",userId).maybeSingle();
+    const { data: goal, error: goalError } = await db.from("learning_goals")
+      .select("id,title,category,desired_outcome,current_level,target_date,weekly_minutes")
+      .eq("id", dto.goal_id).eq("user_id", userId).maybeSingle();
     if (goalError) throw new InternalServerErrorException("Unable to verify the learning goal.");
     if (!goal) throw new NotFoundException("Learning goal was not found.");
 
-    const { data: existing, error: pathError } = await db.from("learning_paths").select("*").eq("user_id",userId).eq("goal_id",goal.id).eq("title","45-day AI engineering roadmap").maybeSingle();
-    if (pathError) throw new InternalServerErrorException("Unable to load the learning path.");
-    let path = existing;
-    if (!path) {
-      const { data, error } = await db.from("learning_paths").insert({user_id:userId,goal_id:goal.id,title:"45-day AI engineering roadmap",description:"A practical 45-day progression from Python foundations to production-ready AI applications.",status:"active"}).select("*").single();
-      if (error || !data) throw new InternalServerErrorException("Unable to create your learning path.");
-      path = data;
-      const items = topics.flatMap((topic,day)=>taskTemplates.map((task,index)=>({user_id:userId,path_id:path!.id,title:"Day "+(day+1)+": "+task.title,description:topic+" — "+task.description,item_type:task.item_type,position:day*4+index,status:"not_started"})));
-      const { error: itemError } = await db.from("learning_path_items").insert(items);
-      if (itemError) {
-        await db.from("learning_paths").delete().eq("id",path.id).eq("user_id",userId);
-        throw new InternalServerErrorException("Unable to create roadmap tasks. Please retry.");
-      }
+    const { data: profile, error: profileError } = await db.from("profiles")
+      .select("display_name,profession,experience_level,interests")
+      .eq("id", userId).maybeSingle();
+    if (profileError) throw new InternalServerErrorException("Unable to load learner profile.");
+
+    const { data: existing, error: existingError } = await db.from("learning_paths")
+      .select("*,items:learning_path_items(*)")
+      .eq("user_id", userId).eq("goal_id", goal.id)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (existingError) throw new InternalServerErrorException("Unable to load the learning path.");
+    if (existing?.items?.length) return { ...existing, items: [...existing.items].sort((a,b) => a.position-b.position) };
+
+    const prompt = [
+      "Create a high-quality personalized 45-day learning curriculum as strict JSON.",
+      "Return only JSON matching: {title:string,description:string,days:[{day:number,title:string,focus:string,tasks:[{title:string,description:string,item_type:'lesson'|'exercise'|'resource'|'project'}]}]}.",
+      "Requirements: exactly 45 sequential days, exactly 4 meaningful distinct tasks per day, practical progression from learner's current level to desired outcome, realistic workload, no generic repeated filler, specific deliverables and hands-on work. Resources must be described by name/topic in task descriptions; do not invent URLs.",
+      "Personalize every day and task to the goal category and learner profile. Do not assume AI engineering unless the goal asks for it.",
+      "LEARNER CONTEXT:",
+      JSON.stringify({
+        goal: { title: goal.title, category: goal.category, desiredOutcome: goal.desired_outcome, currentLevel: goal.current_level, targetDate: goal.target_date, weeklyMinutes: goal.weekly_minutes },
+        profile: { profession: profile?.profession, experienceLevel: profile?.experience_level, interests: profile?.interests },
+      }),
+    ].join("\n");
+    const generated = await this.ai.generateForLearning(req, prompt);
+    const curriculum = this.parseCurriculum(generated.answer);
+
+    const { data: path, error: pathError } = await db.from("learning_paths").insert({
+      user_id: userId, goal_id: goal.id, title: curriculum.title,
+      description: curriculum.description, status: "active",
+    }).select("*").single();
+    if (pathError || !path) throw new InternalServerErrorException("Unable to save the generated learning path.");
+
+    const items = curriculum.days.flatMap(day => day.tasks.map((task, index) => ({
+      user_id: userId, path_id: path.id,
+      title: `Day ${day.day}: ${task.title}`,
+      description: `${day.title} — ${day.focus}. ${task.description}`,
+      item_type: task.item_type, position: (day.day - 1) * 4 + index, status: "not_started",
+    })));
+    const { data: savedItems, error: itemError } = await db.from("learning_path_items").insert(items).select("*");
+    if (itemError || !savedItems || savedItems.length !== 180) {
+      await db.from("learning_path_items").delete().eq("path_id", path.id).eq("user_id", userId);
+      await db.from("learning_paths").delete().eq("id", path.id).eq("user_id", userId);
+      throw new InternalServerErrorException("The generated curriculum could not be saved completely. No partial roadmap was kept.");
     }
+    return { ...path, items: savedItems.sort((a,b) => a.position-b.position), generation: { provider: generated.provider, model: generated.model } };
+  }
 
-    let { data: items, error: itemsError } = await db.from("learning_path_items").select("*").eq("path_id",path.id).eq("user_id",userId).order("position",{ascending:true});
-    if (itemsError) throw new InternalServerErrorException("Unable to load roadmap tasks.");
-
-    // Safely repair the original 46-day seed only when the four excess tasks
-    // have no learner progress. Keep the existing IDs for the first 180 tasks.
-    if (items?.length === 184 && items.every((item,index)=>item.position===index)) {
-      const excessItems = items.slice(180);
-      const excessIds = excessItems.map(item=>item.id);
-      const { data: savedProgress, error: progressError } = await db.from("learning_progress").select("path_item_id").eq("user_id",userId).in("path_item_id",excessIds);
-      if (progressError) throw new InternalServerErrorException("Unable to verify existing roadmap progress.");
-      if (savedProgress?.length) throw new ConflictException("This older roadmap has progress on its final day and cannot be automatically shortened without losing learner data.");
-
-      const finalDayItems = items.slice(176,180);
-      for (let index=0; index<finalDayItems.length; index++) {
-        const task = taskTemplates[index];
-        const { error } = await db.from("learning_path_items").update({
-          title:"Day 45: "+task.title,
-          description:"Deployment, observability & portfolio launch — "+task.description,
-        }).eq("id",finalDayItems[index].id).eq("user_id",userId);
-        if (error) throw new InternalServerErrorException("Unable to update the final roadmap day.");
-      }
-      const { error: deleteError } = await db.from("learning_path_items").delete().eq("path_id",path.id).eq("user_id",userId).in("id",excessIds);
-      if (deleteError) throw new InternalServerErrorException("Unable to remove the four unused duplicate roadmap tasks.");
-      const refreshed = await db.from("learning_path_items").select("*").eq("path_id",path.id).eq("user_id",userId).order("position",{ascending:true});
-      if (refreshed.error) throw new InternalServerErrorException("Unable to verify the repaired roadmap.");
-      items = refreshed.data;
+  private parseCurriculum(raw: string): GeneratedCurriculum {
+    const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+    let value: unknown;
+    try { value = JSON.parse(cleaned); }
+    catch { throw new BadRequestException("The AI provider returned invalid curriculum JSON. Please retry generation."); }
+    if (!value || typeof value !== "object") throw new BadRequestException("The AI provider returned an invalid curriculum.");
+    const curriculum = value as GeneratedCurriculum;
+    if (typeof curriculum.title !== "string" || !curriculum.title.trim() ||
+        typeof curriculum.description !== "string" || !Array.isArray(curriculum.days) || curriculum.days.length !== 45) {
+      throw new BadRequestException("The AI curriculum must contain a title, description and exactly 45 days.");
     }
-
-    return {...path,items:items??[]};
+    curriculum.days.forEach((day, index) => {
+      if (day.day !== index + 1 || typeof day.title !== "string" || typeof day.focus !== "string" ||
+          !Array.isArray(day.tasks) || day.tasks.length !== 4) {
+        throw new BadRequestException(`AI curriculum day ${index + 1} is incomplete.`);
+      }
+      day.tasks.forEach(task => {
+        if (!task.title?.trim() || !task.description?.trim() ||
+            !["lesson", "exercise", "resource", "project"].includes(task.item_type)) {
+          throw new BadRequestException(`AI curriculum day ${index + 1} contains an invalid task.`);
+        }
+      });
+    });
+    return curriculum;
   }
 }
