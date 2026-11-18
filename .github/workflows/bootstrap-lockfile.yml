@@ -33,4 +33,6 @@ jobs:
             exit 0
           fi
           git commit -m "chore: add reproducible npm workspace lockfile"
+          git fetch origin feat/phase-6-learner-insights-clean
+          git rebase origin/feat/phase-6-learner-insights-clean
           git push origin HEAD:feat/phase-6-learner-insights-clean
