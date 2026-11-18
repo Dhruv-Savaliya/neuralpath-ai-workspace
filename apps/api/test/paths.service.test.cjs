@@ -60,15 +60,19 @@ test("curriculum parser rejects missing days, task counts, invalid types and out
   const outOfOrder = batch();
   outOfOrder.days[0].day = 2;
   assert.throws(() => parser().parseCurriculumBatch(JSON.stringify(outOfOrder), 1, 5), /day 1 is incomplete/);
+
+  const duplicateType = batch();
+  duplicateType.days[0].tasks[1].item_type = "lesson";
+  assert.throws(() => parser().parseCurriculumBatch(JSON.stringify(duplicateType), 1, 5), /invalid or duplicate task type/);
 });
 
 test("bootstrap generates nine validated batches and persists exactly 180 ordered tasks", async () => {
   const goal = {
-    id: "goal-1", title: "Learn full-stack development", category: "Technology",
-    desired_outcome: "Build production apps", current_level: "Beginner",
+    id: "goal-1", title: "Start a small business", category: "Business",
+    desired_outcome: "Launch a profitable local business", current_level: "beginner",
     target_date: null, weekly_minutes: 300,
   };
-  const path = { id: "path-1", title: "Full-stack development — 45-day personalized learning path" };
+  const path = { id: "path-1", title: "Start a small business — 45-day learning path" };
   let insertedItems = [];
   let batchCalls = 0;
   let firstPrompt = "";
@@ -120,6 +124,8 @@ test("bootstrap generates nine validated batches and persists exactly 180 ordere
   assert.equal(batchCalls, 9);
   assert.match(firstPrompt, /founder/);
   assert.match(firstPrompt, /business/);
+  assert.match(firstPrompt, /customer problems/);
+  assert.match(firstPrompt, /Do not block broad but interpretable goals/);
   assert.match(firstPrompt, /intensive/);
   assert.match(firstPrompt, /hands_on_projects/);
   assert.match(firstPrompt, /universal learning and career curriculum architect/);
