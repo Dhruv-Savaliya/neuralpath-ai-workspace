@@ -411,7 +411,7 @@ export class AiService {
     errorCode?: string,
   ) {
     try {
-      await req.supabase.from("ai_usage_events").insert({
+      const { error } = await req.supabase.from("ai_usage_events").insert({
         user_id: req.user.id,
         provider,
         model,
@@ -422,6 +422,7 @@ export class AiService {
         succeeded,
         error_code: errorCode ?? null,
       });
+      if (error) this.logger.warn(`AI usage telemetry insert failed: ${error.code ?? "database_error"}`);
     } catch {
       // Telemetry failures must never make a successful AI response fail.
     }
