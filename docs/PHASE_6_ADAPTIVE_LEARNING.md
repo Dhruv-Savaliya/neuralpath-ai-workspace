@@ -6,6 +6,20 @@ Turn the existing 45-day roadmap into a genuinely adaptive learning workspace. R
 
 Phase 6 is additive. It must not rewrite completed progress, silently change a learner's roadmap, or introduce paid infrastructure.
 
+## Current implementation status
+
+The Phase 6 first production slice is implemented on the feature branch and is awaiting final CI, review and the coordinated production release.
+
+- `GET /api/v1/learning/insights`: authenticated Supabase-backed progress, weekly activity, phase completion, timezone-aware streaks, goals and preferences.
+- `GET /api/v1/learning/recommendations`: AI-ranked candidate recommendations through the existing Gemini/Groq service, with deterministic fallback.
+- `POST /api/v1/learning/recommendations/:id/feedback`: validates ownership and records feedback for the selected candidate.
+- `POST /api/v1/learning/recommendations/:id/accept`: validates ownership and explicitly applies the supported weekly-study-time adjustment or acknowledges a still-incomplete roadmap task.
+- `learning_recommendations`: new RLS-protected persistence table, delivered through `supabase/migrations/20261118100000_phase6_learning_recommendations.sql`.
+- AI prompt context excludes learner names, raw goal titles, and internal database IDs. Model output is constrained to server-generated candidate IDs.
+- API CI includes 11 unit/service tests for timezone boundaries, activity, ownership, invalid model output, provider failure, feedback and acceptance.
+
+The implementation does not automatically rewrite a roadmap or mark tasks complete. A focus-task acceptance records the learner's choice; task completion still goes through the existing progress workflow.
+
 ## Existing data to reuse
 
 - `profiles`: display name, profession, experience level, interests, timezone.
@@ -72,7 +86,7 @@ Capture whether a recommendation was helpful, ignored or dismissed, with minimal
 - `POST /api/v1/learning/recommendations/:id/feedback` — learner feedback.
 - `POST /api/v1/learning/recommendations/:id/accept` — explicit approval for a proposed change, with server-side validation.
 
-The final routes and persistence schema must be reviewed before implementation. Prefer reusing existing tables; add a small recommendation/feedback table only if the data cannot be represented safely in current schema.
+The routes and persistence schema above are implemented in the Phase 6 feature branch. The recommendation table is separate because feedback and approval need an auditable, user-owned record.
 
 ## Security and privacy
 
@@ -89,11 +103,11 @@ The final routes and persistence schema must be reviewed before implementation. 
 1. A new account with no progress sees an honest empty state and a real next-task suggestion.
 2. Completing a task updates insights and recommendation context after refresh.
 3. Recommendations refer only to tasks/goals owned by the signed-in user.
-4. An AI outage does not fabricate an AI response or corrupt learner data.
+4. An AI outage does not fabricate an AI response or corrupt learner data; the UI labels deterministic fallback clearly.
 5. A recommendation cannot alter the roadmap without explicit approval.
-6. Cross-user access tests fail closed.
+6. Cross-user access tests fail closed through authenticated user-scoped queries and RLS.
 7. Unit tests cover streak/timezone boundaries, empty history, overdue goals, invalid model output and invalid task IDs.
-8. CI lint, typecheck, build and tests pass.
+8. CI lint, typecheck, build and tests pass on the final commit.
 9. Production smoke tests confirm real authenticated responses with the free provider configuration.
 10. No paid service or plan is enabled.
 
