@@ -16,7 +16,7 @@ The Phase 6 first production slice is implemented on the feature branch and is a
 - `POST /api/v1/learning/recommendations/:id/accept`: validates ownership and explicitly applies the supported weekly-study-time adjustment or acknowledges a still-incomplete roadmap task.
 - `learning_recommendations`: new RLS-protected persistence table, delivered through `supabase/migrations/20261118100000_phase6_learning_recommendations.sql`.
 - AI prompt context excludes learner names, raw goal titles, and internal database IDs. Model output is constrained to server-generated candidate IDs.
-- API CI includes 11 unit/service tests for timezone boundaries, activity, ownership, invalid model output, provider failure, feedback and acceptance.
+- API CI includes offline recommendation fixtures plus unit/service tests for timezone boundaries, activity, ownership, invalid model output, provider fallback, feedback, acceptance, prompt limits, provider errors and generation latency telemetry.
 
 The implementation does not automatically rewrite a roadmap or mark tasks complete. A focus-task acceptance records the learner's choice; task completion still goes through the existing progress workflow.
 
@@ -96,7 +96,7 @@ The routes and persistence schema above are implemented in the Phase 6 feature b
 - Send only the minimum necessary profile/progress context to Gemini. Do not send secrets or sensitive personal data.
 - Treat reflections and retrieved knowledge as untrusted input.
 - Do not infer health, political, religious or other sensitive traits.
-- Log provider/model, operation, latency, outcome and token/character counts where available; never log prompts, reflections or secrets.
+- Log provider/model, operation, latency, outcome, error code and character counts where available; never log prompts, reflections or secrets. Phase 6 records generation latency and sanitized provider-chain failures.
 
 ## Acceptance criteria
 
