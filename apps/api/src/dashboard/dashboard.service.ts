@@ -29,9 +29,9 @@ function getCurrentStreak(completedAtValues: Array<string | null>, timeZone: str
       .filter((value): value is string => Boolean(value)),
   );
 
-  const today = new Date();
-  let anchor = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-  const todayKey = dateKeyInZone(today, timeZone);
+  const todayKey = dateKeyInZone(new Date(), timeZone);
+  const [year, month, day] = todayKey.split("-").map(Number);
+  const anchor = new Date(Date.UTC(year, month - 1, day));
   if (!activeDates.has(todayKey)) anchor.setUTCDate(anchor.getUTCDate() - 1);
 
   let streak = 0;
