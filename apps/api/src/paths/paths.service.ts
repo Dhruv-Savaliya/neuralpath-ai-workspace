@@ -30,7 +30,14 @@ export class PathsService {
       .eq("user_id", userId).eq("goal_id", goal.id)
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (existingError) throw new InternalServerErrorException("Unable to load the learning path.");
-    if (existing?.items?.length) return { ...existing, items: [...existing.items].sort((a,b) => a.position-b.position) };
+    if (existing?.items?.length && existing.title !== "45-day AI engineering roadmap") {
+      return { ...existing, items: [...existing.items].sort((a,b) => a.position-b.position) };
+    }
+    // Keep the legacy hardcoded roadmap and its progress intact, but never present it as newly AI-generated.
+    if (existing?.id && existing.title === "45-day AI engineering roadmap") {
+      const { error: archiveError } = await db.from("learning_paths").update({ status: "archived" }).eq("id", existing.id).eq("user_id", userId);
+      if (archiveError) throw new InternalServerErrorException("Unable to preserve and archive the legacy roadmap.");
+    }
 
     const prompt = [
       "Create a high-quality personalized 45-day learning curriculum as strict JSON.",
