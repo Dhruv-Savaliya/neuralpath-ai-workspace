@@ -93,6 +93,7 @@ export type LearnerInsights = {
     completedLast30Days: number;
     currentStreak: number;
     lastCompletedAt: number | null;
+    weekly: Array<{ weekStart: string; completedTasks: number }>;
   };
   emptyState: { needsGoal: boolean; needsRoadmap: boolean; needsProgress: boolean };
 };
