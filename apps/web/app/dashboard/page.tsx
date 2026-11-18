@@ -112,7 +112,6 @@ export default function Home() {
   const [showQuiz,setShowQuiz] = useState(false);
   const [quizAnswer,setQuizAnswer] = useState("");
   const [toast,setToast] = useState("");
-  const [hydrated,setHydrated] = useState(false);
   const [pathItems,setPathItems] = useState<ApiPathItem[]>([]);
   const [profileName,setProfileName] = useState("Learner");
   const notify = useCallback((s:string) => { setToast(s); window.setTimeout(()=>setToast(""),2600); },[]);
@@ -168,20 +167,29 @@ export default function Home() {
         if (active) applyDashboard(dashboard, selectedPath?.id);
       } catch (cause) {
         if (active) notify(cause instanceof Error ? cause.message : "Cloud progress could not be loaded.");
-      } finally {
-        if (active) setHydrated(true);
       }
     })();
     return () => { active = false; };
   }, [applyDashboard, notify]);
-  const day = days[activeDay-1];
+  const baseDay = days[activeDay-1];
+  const dayItems = pathItems.filter(item => item.position >= (activeDay-1)*4 && item.position < activeDay*4);
+  const day: Day = dayItems.length === 4 ? {
+    ...baseDay,
+    title: dayItems[0].description.split(" — ")[0] || baseDay.title,
+    tasks: baseDay.tasks.map((task, index) => ({
+      ...task,
+      title: dayItems[index].title.replace(/^Day \\d+: /, ""),
+      detail: dayItems[index].description.split(" — ").slice(1).join(" — ") || task.detail,
+    })),
+  } : baseDay;
+  const avatarInitials = profileName.trim().split(/\\s+/).slice(0,2).map(part => part[0]?.toUpperCase()).join("") || "L";
   const doneTasks = day.tasks.filter(t=>checked[`${activeDay}-${t.id}`]).length;
   const progress = Math.round(completed.length/45*100);
   const level = Math.floor(xp/250)+1;
   const xpInLevel = xp%250;
   const nextDay = completed.length ? Math.min(45,Math.max(...completed)+1) : 1;
   async function toggleTask(id:string) {
-    const key=`${activeDay}-${id}`, was=!!checked[key], task=day.tasks.find(t=>t.id===id)!;
+    const key=`${activeDay}-${id}`, was=!!checked[key];
     const itemPosition=(activeDay-1)*4+["learn","code","notes","ship"].indexOf(id);
     const item=pathItems.find(candidate=>candidate.position===itemPosition);
     if (!item) { notify("Your cloud learning path is still being prepared. Refresh and try again."); return; }
@@ -221,11 +229,11 @@ export default function Home() {
       <div className="workspace-label">YOUR JOURNEY</div>
       <div className="side-progress"><div className="side-progress-top"><span>Overall progress</span><b>{progress}%</b></div><div className="progress-track"><i style={{width:`${progress}%`}}/></div><small>{completed.length} of 45 days completed</small></div>
       <div className="phase-menu">{phases.map((p,i)=><button key={p.name} onClick={()=>{setActiveDay(Number(p.range.slice(0,2)));setTab("roadmap");setMenuOpen(false)}} className="phase-link"><span className={`phase-dot ${p.tone}`}/><span>{p.name}</span><small>{p.range}</small></button>)}</div>
-      <div className="sidebar-bottom"><div className="streak-card"><div className="streak-icon"><Flame size={18}/></div><div><b>{streak} day streak</b><small>Keep your momentum alive</small></div><Sparkles size={16} className="streak-spark"/></div><div className="profile-row"><div className="avatar">DS</div><div><b>{profileName}</b><small>Level {level} · AI Engineer in progress</small></div><ChevronDown size={16}/></div><form action={signOut} className="signout-form"><button type="submit">Sign out</button></form></div>
+      <div className="sidebar-bottom"><div className="streak-card"><div className="streak-icon"><Flame size={18}/></div><div><b>{streak} day streak</b><small>Keep your momentum alive</small></div><Sparkles size={16} className="streak-spark"/></div><div className="profile-row"><div className="avatar">{avatarInitials}</div><div><b>{profileName}</b><small>Level {level} · AI Engineer in progress</small></div><ChevronDown size={16}/></div><form action={signOut} className="signout-form"><button type="submit">Sign out</button></form></div>
     </aside>
     {menuOpen&&<div className="mobile-scrim" onClick={()=>setMenuOpen(false)}/>}
     <section className="main-area">
-      <header className="topbar"><div className="top-left"><button className="mobile-menu" onClick={()=>setMenuOpen(true)}><Menu size={20}/></button><div className="breadcrumb">Workspace <ChevronRight size={14}/> <b>{nav.find(n=>n.id===tab)?.label}</b></div></div><div className="top-actions"><div className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}</div><div className="xp-chip"><Zap size={15}/><b>{xp.toLocaleString()}</b><span>XP</span></div><div className="avatar top-avatar">DS</div></div></header>
+      <header className="topbar"><div className="top-left"><button className="mobile-menu" onClick={()=>setMenuOpen(true)}><Menu size={20}/></button><div className="breadcrumb">Workspace <ChevronRight size={14}/> <b>{nav.find(n=>n.id===tab)?.label}</b></div></div><div className="top-actions"><div className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}</div><div className="xp-chip"><Zap size={15}/><b>{xp.toLocaleString()}</b><span>XP</span></div><div className="avatar top-avatar">{avatarInitials}</div></div></header>
       <div className="page-content">
         {tab === "overview" && <><WorkspaceGoalsPanel /><WorkspaceProfilePanel /></>}
         {tab==="overview"&&<AnimatePresence mode="wait"><motion.div key="overview" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:.25}}>
