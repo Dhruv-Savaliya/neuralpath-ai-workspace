@@ -23,6 +23,8 @@ jobs:
           package-manager-cache: false
       - name: Generate reproducible npm workspace lockfile
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Re-resolve safe transitive dependency overrides
+        run: npm update --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Commit lockfile to this feature branch
         run: |
           git config user.name "github-actions[bot]"
