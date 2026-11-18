@@ -2,18 +2,26 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Activity, AlertCircle, CalendarClock, CheckCircle2, Flame, LoaderCircle, RefreshCw, Target } from "lucide-react";
-import { neuralPathApi, type LearnerInsights } from "../../lib/api/client";
+import { neuralPathApi, type LearnerInsights, type LearningRecommendations } from "../../lib/api/client";
 
 export default function LearnerInsightsPanel() {
   const [insights, setInsights] = useState<LearnerInsights | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [recommendations, setRecommendations] = useState<LearningRecommendations | null>(null);
+  const [recommendationMessage, setRecommendationMessage] = useState("");
+  const [recommendationBusy, setRecommendationBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      setInsights(await neuralPathApi.getLearnerInsights());
+      const [nextInsights, nextRecommendations] = await Promise.all([
+        neuralPathApi.getLearnerInsights(),
+        neuralPathApi.getLearningRecommendations(),
+      ]);
+      setInsights(nextInsights);
+      setRecommendations(nextRecommendations);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to load learner insights.");
     } finally {
@@ -136,6 +144,28 @@ export default function LearnerInsightsPanel() {
               </div>
             </>
           )}
+
+          <div style={{ borderTop: "1px solid var(--border,rgba(148,163,184,.2))", paddingTop: 14, marginTop: 16 }}>
+            <b style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13 }}>
+              <Target size={15}/> Adaptive recommendations
+            </b>
+            <small style={{ display: "block", color: "var(--muted,#9ca3af)", margin: "4px 0 10px" }}>
+              {recommendations?.source === "gemini" ? "AI-ranked using your saved learning context." : "Grounded suggestions from your saved roadmap. AI may be unavailable."}
+            </small>
+            {recommendations?.recommendations?.length ? recommendations.recommendations.map(item => (
+              <div key={item.candidateId} style={{ border: "1px solid var(--border,rgba(148,163,184,.18))", borderRadius: 10, padding: 12, marginTop: 8 }}>
+                <b style={{ fontSize: 13 }}>{item.title}</b>
+                <p style={{ color: "var(--muted,#9ca3af)", fontSize: 12, margin: "5px 0 10px" }}>{item.reason}</p>
+                <small style={{ color: "var(--muted,#9ca3af)" }}>About {item.estimatedMinutes} min · Priority {item.priority}</small>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 10 }}>
+                  <button className="text-btn" type="button" disabled={recommendationBusy} onClick={() => void respondToRecommendation(item.candidateId, "accept")}>Accept</button>
+                  <button className="text-btn" type="button" disabled={recommendationBusy} onClick={() => void respondToRecommendation(item.candidateId, "helpful")}>Helpful</button>
+                  <button className="text-btn" type="button" disabled={recommendationBusy} onClick={() => void respondToRecommendation(item.candidateId, "dismissed")}>Dismiss</button>
+                </div>
+              </div>
+            )) : <p style={{ color: "var(--muted,#9ca3af)", fontSize: 12 }}>{recommendations?.message ?? "No recommendations available yet."}</p>}
+            {recommendationMessage ? <p role="status" style={{ color: "var(--muted,#9ca3af)", fontSize: 12 }}>{recommendationMessage}</p> : null}
+          </div>
 
           <p style={{ color: "var(--muted,#9ca3af)", fontSize: 11, margin: "14px 0 0" }}>
             Data source: Supabase · Updated {new Date(insights.generatedAt).toLocaleString()}
