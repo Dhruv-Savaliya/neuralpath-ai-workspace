@@ -6,6 +6,7 @@ const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
 
 export type ApiPathItem = {
   id: string;
+  path_id: string;
   title: string;
   description: string;
   position: number;
@@ -46,6 +47,9 @@ export type WorkspaceDashboard = {
     completedItems: number;
     progressPercent: number;
     completedThisWeek: number;
+    completedDays: number;
+    currentStreak: number;
+    xp: number;
   };
 };
 

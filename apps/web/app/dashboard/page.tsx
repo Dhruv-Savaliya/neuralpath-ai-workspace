@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { signOut } from "../actions/auth";
 import WorkspaceGoalsPanel from "./workspace-goals";
 import WorkspaceProfilePanel from "./workspace-profile";
 import AiTutorPanel from "./ai-tutor-panel";
-import { neuralPathApi, type ApiPathItem } from "../../lib/api/client";
+import { neuralPathApi, type ApiPathItem, type WorkspaceDashboard } from "../../lib/api/client";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity, ArrowUpRight, Award, BookOpen, BrainCircuit, CalendarDays, Check,
@@ -100,9 +100,6 @@ const days: Day[] = topics.map((t, i) => ({
   deliverable: i===6 ? "A CLI expense tracker with JSON persistence and clear input validation." : i===19 ? "A reproducible ML model that predicts expense categories and reports evaluation metrics." : i===24 ? "A trained PyTorch model with a saved checkpoint and a short experiment log." : i===34 ? "A document Q&A prototype that retrieves relevant chunks and cites its sources." : i===44 ? "A deployed BizDhan AI demo, architecture diagram, README, and portfolio case study." : `A small, tested ${t[0].toLowerCase()} exercise committed to your learning repository.`,
   quiz: `Can you explain ${t[0].toLowerCase()} in plain language, implement a tiny example from memory, and describe one real-world use?`
 }));
-const todayKey = () => new Date().toISOString().slice(0,10);
-const xpForLevel = (level:number) => level * 250;
-const initialState = { completed: [] as number[], checked: {} as Record<string, boolean>, xp: 0, streak: 0, lastActive: "", name: "Dhruv" };
 
 export default function Home() {
   const [activeDay,setActiveDay] = useState(1);
@@ -111,87 +108,113 @@ export default function Home() {
   const [checked,setChecked] = useState<Record<string,boolean>>({});
   const [xp,setXp] = useState(0);
   const [streak,setStreak] = useState(0);
-  const [lastActive,setLastActive] = useState("");
   const [menuOpen,setMenuOpen] = useState(false);
   const [showQuiz,setShowQuiz] = useState(false);
   const [quizAnswer,setQuizAnswer] = useState("");
   const [toast,setToast] = useState("");
-  const [hydrated,setHydrated] = useState(false);
   const [pathItems,setPathItems] = useState<ApiPathItem[]>([]);
+  const [profileName,setProfileName] = useState("Learner");
   const notify = useCallback((s:string) => { setToast(s); window.setTimeout(()=>setToast(""),2600); },[]);
+  const applyDashboard = useCallback((dashboard: WorkspaceDashboard, preferredPathId?: string) => {
+    const selectedPath =
+      dashboard.paths.find(path => path.id === preferredPathId) ??
+      dashboard.paths.find(path => path.status === "active") ??
+      dashboard.paths[0];
+    setProfileName(dashboard.profile?.display_name?.trim() || "Learner");
+    setXp(dashboard.stats.xp);
+    setStreak(dashboard.stats.currentStreak);
+
+    if (!selectedPath) {
+      setPathItems([]);
+      setChecked({});
+      setCompleted([]);
+      return;
+    }
+
+    const items = selectedPath.items ?? [];
+    const nextChecked: Record<string, boolean> = {};
+    const nextCompleted: number[] = [];
+    for (const item of items) {
+      const dayNumber = Math.floor(item.position / 4) + 1;
+      const taskId = ["learn", "code", "notes", "ship"][item.position % 4];
+      if (item.progress === "completed" && dayNumber >= 1 && dayNumber <= 45) {
+        nextChecked[`${dayNumber}-${taskId}`] = true;
+      }
+    }
+    for (let dayNumber = 1; dayNumber <= 45; dayNumber++) {
+      if (["learn", "code", "notes", "ship"].every(taskId => nextChecked[`${dayNumber}-${taskId}`])) {
+        nextCompleted.push(dayNumber);
+      }
+    }
+    setPathItems(items);
+    setChecked(nextChecked);
+    setCompleted(nextCompleted);
+  }, []);
+
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("neuralpath-progress-v1");
-      if (raw) { const s = JSON.parse(raw); setCompleted(s.completed ?? []); setChecked(s.checked ?? {}); setXp(s.xp ?? 0); setStreak(s.streak ?? 0); setLastActive(s.lastActive ?? ""); setActiveDay(s.activeDay ?? 1); }
-    } catch {}
-    setHydrated(true);
-  },[]);
-  useEffect(() => { if(hydrated) localStorage.setItem("neuralpath-progress-v1",JSON.stringify({completed,checked,xp,streak,lastActive,activeDay})); },[completed,checked,xp,streak,lastActive,activeDay,hydrated]);
-  useEffect(() => {
-    if (!hydrated) return;
     let active = true;
     (async () => {
       try {
         let dashboard = await neuralPathApi.getDashboard();
         let selectedPath = dashboard.paths.find(path => path.status === "active") ?? dashboard.paths[0];
         if (!selectedPath && dashboard.goals.length) {
-          selectedPath = await neuralPathApi.bootstrapPath(dashboard.goals.find(goal => goal.status === "active")?.id ?? dashboard.goals[0].id);
+          await neuralPathApi.bootstrapPath(
+            dashboard.goals.find(goal => goal.status === "active")?.id ?? dashboard.goals[0].id,
+          );
           dashboard = await neuralPathApi.getDashboard();
-          selectedPath = dashboard.paths.find(path => path.id === selectedPath?.id) ?? dashboard.paths[0];
+          selectedPath = dashboard.paths.find(path => path.status === "active") ?? dashboard.paths[0];
         }
-        if (!active || !selectedPath) {  return; }
-        const items = selectedPath.items ?? [];
-        const nextChecked: Record<string,boolean> = {};
-        const nextCompleted: number[] = [];
-        for (const item of items) {
-          const dayNumber = Math.floor(item.position / 4) + 1;
-          const taskId = ["learn","code","notes","ship"][item.position % 4];
-          if (item.progress === "completed" && dayNumber >= 1 && dayNumber <= 45) nextChecked[`${dayNumber}-${taskId}`] = true;
-        }
-        for (let dayNumber=1; dayNumber<=45; dayNumber++) {
-          if (["learn","code","notes","ship"].every(taskId=>nextChecked[`${dayNumber}-${taskId}`])) nextCompleted.push(dayNumber);
-        }
-        const earnedXp = Object.keys(nextChecked).reduce((sum,key)=>{
-          const taskId = key.split("-")[1];
-          return sum + ({learn:20,code:35,notes:10,ship:15} as Record<string,number>)[taskId];
-        },0) + nextCompleted.length*50;
-        setPathItems(items);
-        setChecked(nextChecked);
-        setCompleted(nextCompleted);
-        setXp(earnedXp);
+        if (active) applyDashboard(dashboard, selectedPath?.id);
       } catch (cause) {
-        if (active) { notify(cause instanceof Error ? cause.message : "Cloud progress could not be loaded."); }
+        if (active) notify(cause instanceof Error ? cause.message : "Cloud progress could not be loaded.");
       }
     })();
     return () => { active = false; };
-  },[hydrated,notify]);
-  const day = days[activeDay-1];
+  }, [applyDashboard, notify]);
+  const baseDay = days[activeDay-1];
+  const dayItems = pathItems.filter(item => item.position >= (activeDay-1)*4 && item.position < activeDay*4);
+  const day: Day = dayItems.length === 4 ? {
+    ...baseDay,
+    title: dayItems[0].description.split(" — ")[0] || baseDay.title,
+    tasks: baseDay.tasks.map((task, index) => ({
+      ...task,
+      title: dayItems[index].title.replace(/^Day \d+: /, ""),
+      detail: dayItems[index].description.split(" — ").slice(1).join(" — ") || task.detail,
+    })),
+  } : baseDay;
+  const avatarInitials = profileName.trim().split(/\s+/).slice(0,2).map(part => part[0]?.toUpperCase()).join("") || "L";
   const doneTasks = day.tasks.filter(t=>checked[`${activeDay}-${t.id}`]).length;
   const progress = Math.round(completed.length/45*100);
   const level = Math.floor(xp/250)+1;
   const xpInLevel = xp%250;
-  const nextDay = completed.length ? Math.min(45,Math.max(...completed)+1) : 1;
+  const nextDay = Array.from({ length: 45 }, (_, index) => index + 1).find(dayNumber => !completed.includes(dayNumber)) ?? 45;
   async function toggleTask(id:string) {
-    const key=`${activeDay}-${id}`, was=!!checked[key], task=day.tasks.find(t=>t.id===id)!;
+    const key=`${activeDay}-${id}`, was=!!checked[key];
     const itemPosition=(activeDay-1)*4+["learn","code","notes","ship"].indexOf(id);
     const item=pathItems.find(candidate=>candidate.position===itemPosition);
     if (!item) { notify("Your cloud learning path is still being prepared. Refresh and try again."); return; }
     setChecked(v=>({...v,[key]:!was}));
-    if(!was) { setXp(v=>v+task.xp); const d=todayKey(); if(lastActive!==d){setStreak(v=>v+1);setLastActive(d);} notify(`+${task.xp} XP earned. Saving to your account…`); }
-    else { setXp(v=>Math.max(0,v-task.xp)); notify("Task unchecked. Saving your update…"); }
+    if(!was) { notify(`Saving task completion and XP to your account…`); }
+    else { notify("Saving your progress update…"); }
     try {
       await neuralPathApi.saveProgress({path_item_id:item.id,status:was?"in_progress":"completed"});
-      notify(was?"Progress updated in your account.":"Progress saved to your account.");
     } catch(cause) {
       setChecked(v=>({...v,[key]:was}));
-      setXp(v=>Math.max(0,v+(was?task.xp:-task.xp)));
       notify(cause instanceof Error?cause.message:"Unable to save progress. Please retry.");
+      return;
+    }
+    try {
+      const refreshed = await neuralPathApi.getDashboard();
+      applyDashboard(refreshed, item.path_id);
+      notify(was?"Progress updated in your account.":"Progress saved to your account.");
+    } catch {
+      notify("Your progress was saved. Refresh the dashboard to update the totals.");
     }
   }
   function finishDay() {
     if(doneTasks<day.tasks.length){notify("Complete all daily tasks before claiming the day.");return;}
-    if(!completed.includes(activeDay)){setCompleted(v=>[...v,activeDay]);setXp(v=>v+50);notify("Day completed! +50 bonus XP and a new step forward.");}
-    else notify("This day is already in your completed record.");
+    if(!completed.includes(activeDay)){notify("All tasks are saved. Refreshing your completed-day total…");}
+    else notify("This day is already in your saved progress.");
   }
   const badges = [
     {name:"First commit",desc:"Complete your first learning day",icon:Code2,earned:completed.length>=1},
@@ -211,18 +234,18 @@ export default function Home() {
       <div className="workspace-label">YOUR JOURNEY</div>
       <div className="side-progress"><div className="side-progress-top"><span>Overall progress</span><b>{progress}%</b></div><div className="progress-track"><i style={{width:`${progress}%`}}/></div><small>{completed.length} of 45 days completed</small></div>
       <div className="phase-menu">{phases.map((p,i)=><button key={p.name} onClick={()=>{setActiveDay(Number(p.range.slice(0,2)));setTab("roadmap");setMenuOpen(false)}} className="phase-link"><span className={`phase-dot ${p.tone}`}/><span>{p.name}</span><small>{p.range}</small></button>)}</div>
-      <div className="sidebar-bottom"><div className="streak-card"><div className="streak-icon"><Flame size={18}/></div><div><b>{streak} day streak</b><small>Keep your momentum alive</small></div><Sparkles size={16} className="streak-spark"/></div><div className="profile-row"><div className="avatar">DS</div><div><b>Dhruv Savaliya</b><small>Level {level} · AI Engineer in progress</small></div><ChevronDown size={16}/></div><form action={signOut} className="signout-form"><button type="submit">Sign out</button></form></div>
+      <div className="sidebar-bottom"><div className="streak-card"><div className="streak-icon"><Flame size={18}/></div><div><b>{streak} day streak</b><small>Keep your momentum alive</small></div><Sparkles size={16} className="streak-spark"/></div><div className="profile-row"><div className="avatar">{avatarInitials}</div><div><b>{profileName}</b><small>Level {level} · AI Engineer in progress</small></div><ChevronDown size={16}/></div><form action={signOut} className="signout-form"><button type="submit">Sign out</button></form></div>
     </aside>
     {menuOpen&&<div className="mobile-scrim" onClick={()=>setMenuOpen(false)}/>}
     <section className="main-area">
-      <header className="topbar"><div className="top-left"><button className="mobile-menu" onClick={()=>setMenuOpen(true)}><Menu size={20}/></button><div className="breadcrumb">Workspace <ChevronRight size={14}/> <b>{nav.find(n=>n.id===tab)?.label}</b></div></div><div className="top-actions"><div className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}</div><div className="xp-chip"><Zap size={15}/><b>{xp.toLocaleString()}</b><span>XP</span></div><div className="avatar top-avatar">DS</div></div></header>
+      <header className="topbar"><div className="top-left"><button className="mobile-menu" onClick={()=>setMenuOpen(true)}><Menu size={20}/></button><div className="breadcrumb">Workspace <ChevronRight size={14}/> <b>{nav.find(n=>n.id===tab)?.label}</b></div></div><div className="top-actions"><div className="date-chip"><CalendarDays size={15}/>{new Date().toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}</div><div className="xp-chip"><Zap size={15}/><b>{xp.toLocaleString()}</b><span>XP</span></div><div className="avatar top-avatar">{avatarInitials}</div></div></header>
       <div className="page-content">
         {tab === "overview" && <><WorkspaceGoalsPanel /><WorkspaceProfilePanel /></>}
         {tab==="overview"&&<AnimatePresence mode="wait"><motion.div key="overview" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:.25}}>
           <div className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-dot"/> YOUR PERSONAL AI BUILD SPACE</div><h1>Build your future in <span>AI.</span></h1><p className="subhead">Small steps. Real projects. Skills that compound. Let&apos;s make today count.</p></div><div className="date-note"><span>YOUR NEXT SESSION</span><b>Day {nextDay} <span>of 45</span></b><small>{days[nextDay-1].title}</small></div></div>
           <div className="hero-card"><div className="hero-grid"/><div className="hero-content"><div className="hero-kicker"><Sparkles size={14}/> TODAY&apos;S FOCUS · DAY {activeDay.toString().padStart(2,"0")}</div><h2>{day.title}</h2><p>{day.focus}. Build understanding by doing, not just watching.</p><div className="hero-meta"><span><Clock3 size={14}/> 2–3 hours</span><span><Target size={14}/> 4 focused tasks</span><span><Zap size={14}/> Up to 130 XP</span></div><button className="primary-btn" onClick={()=>setTab("roadmap")}>Open today&apos;s plan <ArrowUpRight size={16}/></button></div><div className="hero-art"><div className="orb orb-one"/><div className="orb orb-two"/><div className="orbit orbit-a"/><div className="orbit orbit-b"/><div className="core"><BrainCircuit size={46}/></div><div className="float-tag tag-top"><Code2 size={14}/> BUILD</div><div className="float-tag tag-bottom"><Sparkles size={14}/> EVOLVE</div></div></div>
           <div className="stats-grid"><Stat icon={ChartNoAxesCombined} label="Learning progress" value={`${progress}%`} detail={`${completed.length} days completed`} tone="purple"/><Stat icon={Zap} label="Total experience" value={xp.toLocaleString()} detail={`Level ${level} · ${250-xpInLevel} XP to next`} tone="blue"/><Stat icon={Flame} label="Current streak" value={`${streak} days`} detail="Consistency beats intensity" tone="orange"/><Stat icon={Award} label="Badges unlocked" value={`${badges.filter(b=>b.earned).length}/${badges.length}`} detail="Earn rewards as you grow" tone="green"/></div>
-          <div className="content-grid"><section className="panel today-panel"><div className="panel-head"><div><span className="section-eyebrow">YOUR CHECKLIST</span><h3>Today&apos;s action plan</h3></div><button className="text-btn" onClick={()=>setTab("roadmap")}>View full plan <ArrowUpRight size={14}/></button></div><div className="task-list">{day.tasks.map((t,i)=><TaskRow key={t.id} task={t} index={i} done={!!checked[`${activeDay}-${t.id}`]} onToggle={()=>toggleTask(t.id)}/>)}</div><div className="task-footer"><span>{doneTasks} of {day.tasks.length} tasks completed</span><div className="mini-track"><i style={{width:`${doneTasks/day.tasks.length*100}%`}}/></div><button className="complete-btn" onClick={finishDay}><Check size={15}/> Claim day</button></div></section>
+          <div className="content-grid"><section className="panel today-panel"><div className="panel-head"><div><span className="section-eyebrow">YOUR CHECKLIST</span><h3>Today&apos;s action plan</h3></div><button className="text-btn" onClick={()=>setTab("roadmap")}>View full plan <ArrowUpRight size={14}/></button></div><div className="task-list">{day.tasks.map((t,i)=><TaskRow key={t.id} task={t} index={i} done={!!checked[`${activeDay}-${t.id}`]} onToggle={()=>toggleTask(t.id)}/>)}</div><div className="task-footer"><span>{doneTasks} of {day.tasks.length} tasks completed</span><div className="mini-track"><i style={{width:`${doneTasks/day.tasks.length*100}%`}}/></div><button className="complete-btn" onClick={finishDay} disabled={completed.includes(activeDay)}><Check size={15}/> {completed.includes(activeDay) ? "Day completed" : "Check day"}</button></div></section>
           <section className="panel side-panel"><div className="panel-head"><div><span className="section-eyebrow">KEEP GROWING</span><h3>Next milestone</h3></div><Trophy size={19} className="muted-icon"/></div><div className="milestone-card"><div className="milestone-icon"><Rocket size={22}/></div><div><b>{completed.includes(45)?"AI Engineer journey complete!":"Build your AI portfolio"}</b><p>{completed.length<20?"Create a working ML model and understand its performance.":completed.length<38?"Turn AI concepts into a reliable application.":"Ship your BizDhan AI capstone and tell its story."}</p></div></div><div className="panel-divider"/><div className="resource-quick"><div className="resource-icon"><BookOpen size={17}/></div><div><b>Recommended lesson</b><small>{day.video.label}</small></div><a href={day.video.url} target="_blank" rel="noreferrer" aria-label="Open lesson"><ArrowUpRight size={16}/></a></div><div className="resource-quick"><div className="resource-icon mint"><ExternalLink size={17}/></div><div><b>Official study material</b><small>{day.resource.label}</small></div><a href={day.resource.url} target="_blank" rel="noreferrer" aria-label="Open study material"><ArrowUpRight size={16}/></a></div></section></div>
           <div className="bottom-grid"><section className="panel path-panel"><div className="panel-head"><div><span className="section-eyebrow">THE BIG PICTURE</span><h3>Your learning path</h3></div><button className="text-btn" onClick={()=>setTab("roadmap")}>Explore roadmap <ArrowUpRight size={14}/></button></div><div className="phase-cards">{phases.map((p,i)=>{const Icon=p.icon;const start=Number(p.range.slice(0,2)),end=Number(p.range.slice(-2));const count=completed.filter(d=>d>=start&&d<=end).length;return <button key={p.name} className="phase-card" onClick={()=>{setActiveDay(start);setTab("roadmap")}}><div className={`phase-icon ${p.tone}`}><Icon size={17}/></div><div className="phase-card-text"><b>{p.name}</b><small>{count}/{end-start+1} lessons</small></div><ChevronRight size={15}/></button>})}</div></section><section className="quote-panel"><div className="quote-mark">“</div><p>The goal isn&apos;t to finish a course. It&apos;s to become someone who can build useful things with AI.</p><span>YOUR BUILDER MINDSET</span><div className="quote-stars"><Star/><Star/><Star/></div></section></div>
         </motion.div></AnimatePresence>}
