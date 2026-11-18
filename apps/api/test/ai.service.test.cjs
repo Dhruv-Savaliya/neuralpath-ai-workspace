@@ -57,3 +57,49 @@ test("learning generation rejects oversized prompts before calling a provider", 
   assert.equal(called, false);
   assert.equal(events.length, 0);
 });
+
+
+test("Gemini 429 uses the configured Groq GPT-OSS fallback", async () => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push(String(url));
+    if (String(url).includes("generativelanguage.googleapis.com")) {
+      return new Response(JSON.stringify({ error: { message: "rate limited" } }), {
+        status: 429,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ choices: [{ message: { content: "{\\"recommendations\\":[]}" } }] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  try {
+    const config = {
+      get(key) {
+        return ({
+          GEMINI_API_KEY: "test-gemini-key",
+          GEMINI_MODEL: "gemini-3.8-flash",
+          GROQ_API_KEY: "test-groq-key",
+          GROQ_MODEL: "openai/gpt-oss-120b",
+        })[key];
+      },
+    };
+    const service = new AiService(config);
+    service.recordUsage = async () => {};
+    const result = await service.generateForLearning(
+      { user: { id: "learner-a" } },
+      "candidate-only learning context",
+    );
+
+    assert.equal(result.provider, "groq");
+    assert.equal(result.model, "openai/gpt-oss-120b");
+    assert.equal(calls.length, 2);
+    assert.ok(calls[0].includes("generativelanguage.googleapis.com"));
+    assert.ok(calls[1].includes("api.groq.com"));
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
