@@ -23,7 +23,9 @@ create index if not exists learning_recommendations_owner_created_idx
 
 alter table public.learning_recommendations enable row level security;
 revoke all on public.learning_recommendations from anon, authenticated;
-grant select, insert, update on public.learning_recommendations to authenticated;
+grant select, insert on public.learning_recommendations to authenticated;
+grant update (feedback, feedback_candidate_id, accepted_at, accepted_action)
+  on public.learning_recommendations to authenticated;
 
 drop policy if exists learning_recommendations_select_own on public.learning_recommendations;
 create policy learning_recommendations_select_own
