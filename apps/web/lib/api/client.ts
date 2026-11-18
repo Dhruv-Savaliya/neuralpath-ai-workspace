@@ -111,7 +111,7 @@ export type LearningRecommendation = {
 };
 export type LearningRecommendations = {
   id?: string;
-  source: "gemini" | "deterministic";
+  source: "gemini" | "groq" | "deterministic";
   recommendations: LearningRecommendation[];
   message?: string;
 };
