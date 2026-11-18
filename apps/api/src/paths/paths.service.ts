@@ -62,7 +62,7 @@ export class PathsService {
         preferredDays: preferences?.preferred_days ?? [],
       },
     });
-    const days: GeneratedDay[] = [];
+    if (!profile?.onboarding_completed) {\n      throw new BadRequestException("Complete your onboarding profile before generating a personalized learning path.");\n    }\n    const days: GeneratedDay[] = [];
 
     // Small independently validated batches keep responses well below provider output limits.
     for (let startDay = 1; startDay <= TOTAL_DAYS; startDay += DAYS_PER_BATCH) {
@@ -104,7 +104,7 @@ export class PathsService {
 
     const curriculum: GeneratedCurriculum = {
       title: `${goal.title.trim()} — 45-day personalized learning path`,
-      description: `A personalized 45-day learning plan for ${goal.title}, generated in validated batches and tailored to your current level and desired outcome.`,
+      description: `A personalized 45-day learning plan for ${goal.title}, generated from your onboarding profile, preferences, current level and desired outcome.`,
       days,
     };
 
