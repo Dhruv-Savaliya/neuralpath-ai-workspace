@@ -53,6 +53,50 @@ export type WorkspaceDashboard = {
   };
 };
 
+export type LearnerInsights = {
+  generatedAt: string;
+  dataSource: "supabase";
+  hasActivity: boolean;
+  learner: {
+    displayName: string;
+    experienceLevel: string | null;
+    interests: string[];
+    timezone: string;
+  };
+  preferences: {
+    learning_formats: string[];
+    learning_pace: string;
+    weekly_minutes: number;
+    language_code: string;
+    preferred_days: number[];
+  } | null;
+  goals: Array<{
+    id: string;
+    title: string;
+    category: string;
+    priority: number;
+    targetDate: string | null;
+    daysUntilTarget: number | null;
+    weeklyMinutes: number;
+  }>;
+  roadmap: {
+    pathId: string | null;
+    title: string | null;
+    completedTasks: number;
+    totalTasks: number;
+    progressPercent: number;
+    nextTasks: Array<{ id: string; title: string; description: string; day: number; status: string }>;
+    phases: Array<{ name: string; firstDay: number; lastDay: number; completedTasks: number; totalTasks: number; progressPercent: number }>;
+  };
+  activity: {
+    completedLast7Days: number;
+    completedLast30Days: number;
+    currentStreak: number;
+    lastCompletedAt: number | null;
+  };
+  emptyState: { needsGoal: boolean; needsRoadmap: boolean; needsProgress: boolean };
+};
+
 export type KnowledgeSource = {
   source_id: string;
   title: string;
@@ -93,6 +137,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const neuralPathApi = {
   isConfigured: Boolean(baseUrl),
   getDashboard: () => request<WorkspaceDashboard>("/dashboard"),
+  getLearnerInsights: () => request<LearnerInsights>("/learning/insights"),
   getGoals: () => request<ApiGoal[]>("/goals"),
   getProfile: () => request<{ id: string; display_name: string; profession: string; experience_level: string; interests: string[]; timezone: string }>("/profile"),
   updateProfile: (input: { display_name?: string; profession?: string; experience_level?: string; interests?: string[]; timezone?: string }) =>
