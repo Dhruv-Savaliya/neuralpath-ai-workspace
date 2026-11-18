@@ -61,6 +61,34 @@ export default function LearnerInsightsPanel() {
             })}
           </div>
 
+          {!insights.hasActivity ? (
+            <p style={{ color: "var(--muted,#9ca3af)", fontSize: 13, margin: "0 0 16px" }}>
+              No completed learning activity has been saved yet. Complete a roadmap task and your activity trends will appear here.
+            </p>
+          ) : null}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12, marginBottom: 16 }}>
+            <div style={{ border: "1px solid var(--border,rgba(148,163,184,.18))", borderRadius: 10, padding: 12 }}>
+              <b style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13 }}><Target size={15}/> Active learning goals</b>
+              {insights.goals.length ? insights.goals.map(goal => (
+                <div key={goal.id} style={{ marginTop: 8, fontSize: 12 }}>
+                  <b>{goal.title}</b>
+                  <small style={{ display: "block", color: "var(--muted,#9ca3af)" }}>
+                    Priority {goal.priority}{goal.daysUntilTarget === null ? "" : ` · ${goal.daysUntilTarget} days to target`}
+                  </small>
+                </div>
+              )) : <small style={{ display: "block", color: "var(--muted,#9ca3af)", marginTop: 8 }}>No active goals saved.</small>}
+            </div>
+            <div style={{ border: "1px solid var(--border,rgba(148,163,184,.18))", borderRadius: 10, padding: 12 }}>
+              <b style={{ display: "block", fontSize: 13 }}>Learning preferences</b>
+              {insights.preferences ? (
+                <small style={{ display: "block", color: "var(--muted,#9ca3af)", marginTop: 8 }}>
+                  {insights.preferences.learning_pace} pace · {insights.preferences.weekly_minutes} minutes/week · {insights.preferences.language_code}
+                </small>
+              ) : <small style={{ display: "block", color: "var(--muted,#9ca3af)", marginTop: 8 }}>No learning preferences saved yet.</small>}
+            </div>
+          </div>
+
           {!insights.roadmap.pathId ? (
             <p style={{ color: "var(--muted,#9ca3af)", fontSize: 13 }}>
               {insights.emptyState.needsGoal ? "Add a learning goal to create your first roadmap." : "Create a roadmap from one of your saved goals to see phase insights."}
