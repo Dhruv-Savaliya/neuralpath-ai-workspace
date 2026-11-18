@@ -183,6 +183,15 @@ export class AiService {
     };
   }
 
+  async generateForLearning(req: AuthenticatedRequest, prompt: string) {
+    if (prompt.length > 12000) {
+      throw new BadRequestException("Learning context is too large to process.");
+    }
+    const generated = await this.generate(prompt);
+    await this.recordUsage(req, generated.provider, generated.model, "generation", prompt.length, generated.answer.length);
+    return generated;
+  }
+
   private chunkText(input: string): string[] {
     const normalized = input.replace(/\r\n/g, "\n").replace(/[\t ]+/g, " ").trim();
     const chunks: string[] = [];
