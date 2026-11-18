@@ -71,6 +71,7 @@ test("bootstrap generates nine validated batches and persists exactly 180 ordere
   const path = { id: "path-1", title: "Full-stack development — 45-day personalized learning path" };
   let insertedItems = [];
   let batchCalls = 0;
+  let firstPrompt = "";
 
   const db = {
     from(table) {
@@ -78,7 +79,13 @@ test("bootstrap generates nine validated batches and persists exactly 180 ordere
         return { select() { return this; }, eq() { return this; }, maybeSingle: async () => ({ data: goal, error: null }) };
       }
       if (table === "profiles") {
-        return { select() { return this; }, eq() { return this; }, maybeSingle: async () => ({ data: { profession: "Developer", experience_level: "Beginner", interests: ["web"] }, error: null }) };
+        return { select() { return this; }, eq() { return this; }, maybeSingle: async () => ({ data: { display_name: "Learner", profession: "founder", experience_level: "Beginner", interests: ["business", "marketing"], timezone: "Asia/Kolkata", onboarding_completed: true }, error: null }) };
+      }
+      if (table === "learner_preferences") {
+        return { select() { return this; }, eq() { return this; }, maybeSingle: async () => ({
+          data: { learning_formats: ["video", "hands_on_projects"], learning_pace: "intensive", weekly_minutes: 600, language_code: "en", preferred_days: [1, 2, 3] },
+          error: null,
+        }) };
       }
       if (table === "learning_paths") {
         return {
@@ -99,6 +106,7 @@ test("bootstrap generates nine validated batches and persists exactly 180 ordere
 
   const ai = {
     async generateForLearning(_req, _prompt, options) {
+      if (!firstPrompt) firstPrompt = _prompt;
       assert.equal(options.jsonMode, true);
       assert.equal(options.preferFallback, false);
       batchCalls += 1;
@@ -110,6 +118,11 @@ test("bootstrap generates nine validated batches and persists exactly 180 ordere
   const result = await service.bootstrap({ user: { id: "learner-1" }, supabase: db }, { goal_id: goal.id });
 
   assert.equal(batchCalls, 9);
+  assert.match(firstPrompt, /founder/);
+  assert.match(firstPrompt, /business/);
+  assert.match(firstPrompt, /intensive/);
+  assert.match(firstPrompt, /hands_on_projects/);
+  assert.match(firstPrompt, /universal learning and career curriculum architect/);
   assert.equal(result.items.length, 180);
   assert.equal(result.generation.days, 45);
   assert.equal(result.generation.tasks, 180);
