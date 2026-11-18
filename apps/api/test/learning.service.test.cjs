@@ -108,10 +108,10 @@ test("getRecommendations rejects model-invented candidate identifiers and falls 
 
 test("recordFeedback only updates a recommendation owned by the authenticated learner", async () => {
   const db = makeDb({
-    learning_recommendations: { data: { id: "recommendation-a" }, error: null },
+    learning_recommendations: { data: { id: "recommendation-a", payload: { recommendations: [{ candidateId: "pace:weekly-minutes" }] }, accepted_at: null, feedback: null }, error: null },
   });
   const service = new LearningService({ generateForLearning: async () => { throw new Error("not used"); } });
-  const result = await service.recordFeedback(learnerRequest(db), "recommendation-a", { feedback: "helpful" });
+  const result = await service.recordFeedback(learnerRequest(db), "recommendation-a", { candidateId: "pace:weekly-minutes", feedback: "helpful" });
 
   assert.deepEqual(result, { saved: true, feedback: "helpful" });
   assert.ok(db.calls.some(call => call.table === "learning_recommendations" && call.method === "eq" && call.column === "user_id" && call.value === "learner-a"));
