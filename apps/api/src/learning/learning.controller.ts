@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UseGuards } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import type { AuthenticatedRequest } from "../common/authenticated-request";
 import { SupabaseAuthGuard } from "../auth/supabase-auth.guard";
@@ -26,7 +26,7 @@ export class LearningController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   feedback(
     @Req() req: AuthenticatedRequest,
-    @Param("id") id: string,
+    @Param("id", new ParseUUIDPipe()) id: string,
     @Body() dto: RecommendationFeedbackDto,
   ) {
     return this.learning.recordFeedback(req, id, dto);
