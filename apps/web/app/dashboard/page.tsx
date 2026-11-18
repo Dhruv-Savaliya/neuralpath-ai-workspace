@@ -198,12 +198,17 @@ export default function Home() {
     else { notify("Saving your progress update…"); }
     try {
       await neuralPathApi.saveProgress({path_item_id:item.id,status:was?"in_progress":"completed"});
-      const refreshed = await neuralPathApi.getDashboard();
-      applyDashboard(refreshed, item.path_id);
-      notify(was?"Progress updated in your account.":"Progress saved to your account.");
     } catch(cause) {
       setChecked(v=>({...v,[key]:was}));
       notify(cause instanceof Error?cause.message:"Unable to save progress. Please retry.");
+      return;
+    }
+    try {
+      const refreshed = await neuralPathApi.getDashboard();
+      applyDashboard(refreshed, item.path_id);
+      notify(was?"Progress updated in your account.":"Progress saved to your account.");
+    } catch {
+      notify("Your progress was saved. Refresh the dashboard to update the totals.");
     }
   }
   function finishDay() {
