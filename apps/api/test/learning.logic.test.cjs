@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const {
   localDateKey,
   streakFromDates,
@@ -75,3 +77,15 @@ test("deterministic fallback only uses server-created candidates", () => {
   assert.equal(result[0].taskId, "owned");
   assert.match(result[0].reason, /saved roadmap/);
 });
+
+
+const evaluationCases = JSON.parse(fs.readFileSync(
+  path.join(__dirname, "fixtures", "learning-recommendation-evals.json"),
+  "utf8",
+));
+for (const evaluation of evaluationCases) {
+  test(`offline recommendation evaluation: ${evaluation.name}`, () => {
+    const result = validateRankedRecommendations(evaluation.output, evaluation.candidates);
+    assert.deepEqual(result.map(item => item.candidateId), evaluation.expectedCandidateIds);
+  });
+}
