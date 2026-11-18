@@ -187,9 +187,23 @@ export class AiService {
     if (prompt.length > 12000) {
       throw new BadRequestException("Learning context is too large to process.");
     }
-    const generated = await this.generate(prompt);
-    await this.recordUsage(req, generated.provider, generated.model, "generation", prompt.length, generated.answer.length);
-    return generated;
+    const startedAt = Date.now();
+    const geminiModel = this.config.get<string>("GEMINI_MODEL") ?? "gemini-3.8-flash";
+    const groqModel = this.config.get<string>("GROQ_MODEL") ?? "openai/gpt-oss-120b";
+    try {
+      const generated = await this.generate(prompt);
+      await this.recordUsage(
+        req, generated.provider, generated.model, "generation",
+        prompt.length, generated.answer.length, Date.now() - startedAt, true,
+      );
+      return generated;
+    } catch (error) {
+      await this.recordUsage(
+        req, "generation_chain", `${geminiModel}+${groqModel}`, "generation",
+        prompt.length, 0, Date.now() - startedAt, false, "provider_unavailable",
+      );
+      throw error;
+    }
   }
 
   private chunkText(input: string): string[] {
@@ -342,6 +356,9 @@ export class AiService {
     operation: "embedding" | "generation",
     inputChars: number,
     outputChars: number,
+    latencyMs?: number,
+    succeeded = true,
+    errorCode?: string,
   ) {
     try {
       await req.supabase.from("ai_usage_events").insert({
@@ -351,7 +368,9 @@ export class AiService {
         operation,
         input_chars: inputChars,
         output_chars: outputChars,
-        succeeded: true,
+        latency_ms: latencyMs ?? null,
+        succeeded,
+        error_code: errorCode ?? null,
       });
     } catch {
       // Telemetry failures must never make a successful AI response fail.
