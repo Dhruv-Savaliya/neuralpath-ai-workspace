@@ -103,7 +103,7 @@ export default function Home() {
           <h1 className="text-2xl font-semibold">Generate a learning path from your goal</h1>
           <p className="text-slate-300">The backend uses your saved goal, learner profile, experience and study schedule to request a real AI-generated curriculum. It is saved to your account before appearing here.</p>
           {dashboard?.goals.length ? dashboard.goals.map(goal => <div key={goal.id} className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-            <div><h2 className="font-medium">{goal.title}</h2><p className="text-sm text-slate-400">{goal.category} · {goal.current_level} · {goal.weekly_minutes} minutes/week</p></div>
+            <div><h2 className="font-medium">{goal.title}</h2><p className="text-sm text-slate-400">{goal.category} · {goal.current_level}</p></div>
             <button disabled={generating} onClick={() => generate(goal.id)} className="rounded-lg bg-indigo-500 px-4 py-2 font-medium disabled:opacity-50">{generating ? "Generating…" : "Generate / open path"}</button>
           </div>) : <p className="text-slate-400">Create a learning goal first. Your saved goals will appear here.</p>}
         </section>
