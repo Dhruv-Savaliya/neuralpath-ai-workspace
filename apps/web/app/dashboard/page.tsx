@@ -5,7 +5,7 @@ import { signOut } from "../actions/auth";
 import WorkspaceGoalsPanel from "./workspace-goals";
 import WorkspaceProfilePanel from "./workspace-profile";
 import AiTutorPanel from "./ai-tutor-panel";
-import { neuralPathApi, type ApiPathItem } from "../../lib/api/client";
+import { neuralPathApi, type ApiPathItem, type WorkspaceDashboard } from "../../lib/api/client";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity, ArrowUpRight, Award, BookOpen, BrainCircuit, CalendarDays, Check,
@@ -100,9 +100,6 @@ const days: Day[] = topics.map((t, i) => ({
   deliverable: i===6 ? "A CLI expense tracker with JSON persistence and clear input validation." : i===19 ? "A reproducible ML model that predicts expense categories and reports evaluation metrics." : i===24 ? "A trained PyTorch model with a saved checkpoint and a short experiment log." : i===34 ? "A document Q&A prototype that retrieves relevant chunks and cites its sources." : i===44 ? "A deployed BizDhan AI demo, architecture diagram, README, and portfolio case study." : `A small, tested ${t[0].toLowerCase()} exercise committed to your learning repository.`,
   quiz: `Can you explain ${t[0].toLowerCase()} in plain language, implement a tiny example from memory, and describe one real-world use?`
 }));
-const todayKey = () => new Date().toISOString().slice(0,10);
-const xpForLevel = (level:number) => level * 250;
-const initialState = { completed: [] as number[], checked: {} as Record<string, boolean>, xp: 0, streak: 0, lastActive: "", name: "Dhruv" };
 
 export default function Home() {
   const [activeDay,setActiveDay] = useState(1);
@@ -111,60 +108,72 @@ export default function Home() {
   const [checked,setChecked] = useState<Record<string,boolean>>({});
   const [xp,setXp] = useState(0);
   const [streak,setStreak] = useState(0);
-  const [lastActive,setLastActive] = useState("");
   const [menuOpen,setMenuOpen] = useState(false);
   const [showQuiz,setShowQuiz] = useState(false);
   const [quizAnswer,setQuizAnswer] = useState("");
   const [toast,setToast] = useState("");
   const [hydrated,setHydrated] = useState(false);
   const [pathItems,setPathItems] = useState<ApiPathItem[]>([]);
+  const [profileName,setProfileName] = useState("Learner");
   const notify = useCallback((s:string) => { setToast(s); window.setTimeout(()=>setToast(""),2600); },[]);
+  const applyDashboard = useCallback((dashboard: WorkspaceDashboard, preferredPathId?: string) => {
+    const selectedPath =
+      dashboard.paths.find(path => path.id === preferredPathId) ??
+      dashboard.paths.find(path => path.status === "active") ??
+      dashboard.paths[0];
+    setProfileName(dashboard.profile?.display_name?.trim() || "Learner");
+    setXp(dashboard.stats.xp);
+    setStreak(dashboard.stats.currentStreak);
+
+    if (!selectedPath) {
+      setPathItems([]);
+      setChecked({});
+      setCompleted([]);
+      return;
+    }
+
+    const items = selectedPath.items ?? [];
+    const nextChecked: Record<string, boolean> = {};
+    const nextCompleted: number[] = [];
+    for (const item of items) {
+      const dayNumber = Math.floor(item.position / 4) + 1;
+      const taskId = ["learn", "code", "notes", "ship"][item.position % 4];
+      if (item.progress === "completed" && dayNumber >= 1 && dayNumber <= 45) {
+        nextChecked[`${dayNumber}-${taskId}`] = true;
+      }
+    }
+    for (let dayNumber = 1; dayNumber <= 45; dayNumber++) {
+      if (["learn", "code", "notes", "ship"].every(taskId => nextChecked[`${dayNumber}-${taskId}`])) {
+        nextCompleted.push(dayNumber);
+      }
+    }
+    setPathItems(items);
+    setChecked(nextChecked);
+    setCompleted(nextCompleted);
+  }, []);
+
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("neuralpath-progress-v1");
-      if (raw) { const s = JSON.parse(raw); setCompleted(s.completed ?? []); setChecked(s.checked ?? {}); setXp(s.xp ?? 0); setStreak(s.streak ?? 0); setLastActive(s.lastActive ?? ""); setActiveDay(s.activeDay ?? 1); }
-    } catch {}
-    setHydrated(true);
-  },[]);
-  useEffect(() => { if(hydrated) localStorage.setItem("neuralpath-progress-v1",JSON.stringify({completed,checked,xp,streak,lastActive,activeDay})); },[completed,checked,xp,streak,lastActive,activeDay,hydrated]);
-  useEffect(() => {
-    if (!hydrated) return;
     let active = true;
     (async () => {
       try {
         let dashboard = await neuralPathApi.getDashboard();
         let selectedPath = dashboard.paths.find(path => path.status === "active") ?? dashboard.paths[0];
         if (!selectedPath && dashboard.goals.length) {
-          selectedPath = await neuralPathApi.bootstrapPath(dashboard.goals.find(goal => goal.status === "active")?.id ?? dashboard.goals[0].id);
+          await neuralPathApi.bootstrapPath(
+            dashboard.goals.find(goal => goal.status === "active")?.id ?? dashboard.goals[0].id,
+          );
           dashboard = await neuralPathApi.getDashboard();
-          selectedPath = dashboard.paths.find(path => path.id === selectedPath?.id) ?? dashboard.paths[0];
+          selectedPath = dashboard.paths.find(path => path.status === "active") ?? dashboard.paths[0];
         }
-        if (!active || !selectedPath) {  return; }
-        const items = selectedPath.items ?? [];
-        const nextChecked: Record<string,boolean> = {};
-        const nextCompleted: number[] = [];
-        for (const item of items) {
-          const dayNumber = Math.floor(item.position / 4) + 1;
-          const taskId = ["learn","code","notes","ship"][item.position % 4];
-          if (item.progress === "completed" && dayNumber >= 1 && dayNumber <= 45) nextChecked[`${dayNumber}-${taskId}`] = true;
-        }
-        for (let dayNumber=1; dayNumber<=45; dayNumber++) {
-          if (["learn","code","notes","ship"].every(taskId=>nextChecked[`${dayNumber}-${taskId}`])) nextCompleted.push(dayNumber);
-        }
-        const earnedXp = Object.keys(nextChecked).reduce((sum,key)=>{
-          const taskId = key.split("-")[1];
-          return sum + ({learn:20,code:35,notes:10,ship:15} as Record<string,number>)[taskId];
-        },0) + nextCompleted.length*50;
-        setPathItems(items);
-        setChecked(nextChecked);
-        setCompleted(nextCompleted);
-        setXp(earnedXp);
+        if (active) applyDashboard(dashboard, selectedPath?.id);
       } catch (cause) {
-        if (active) { notify(cause instanceof Error ? cause.message : "Cloud progress could not be loaded."); }
+        if (active) notify(cause instanceof Error ? cause.message : "Cloud progress could not be loaded.");
+      } finally {
+        if (active) setHydrated(true);
       }
     })();
     return () => { active = false; };
-  },[hydrated,notify]);
+  }, [applyDashboard, notify]);
   const day = days[activeDay-1];
   const doneTasks = day.tasks.filter(t=>checked[`${activeDay}-${t.id}`]).length;
   const progress = Math.round(completed.length/45*100);
@@ -177,21 +186,22 @@ export default function Home() {
     const item=pathItems.find(candidate=>candidate.position===itemPosition);
     if (!item) { notify("Your cloud learning path is still being prepared. Refresh and try again."); return; }
     setChecked(v=>({...v,[key]:!was}));
-    if(!was) { setXp(v=>v+task.xp); const d=todayKey(); if(lastActive!==d){setStreak(v=>v+1);setLastActive(d);} notify(`+${task.xp} XP earned. Saving to your account…`); }
-    else { setXp(v=>Math.max(0,v-task.xp)); notify("Task unchecked. Saving your update…"); }
+    if(!was) { notify(`Saving task completion and XP to your account…`); }
+    else { notify("Saving your progress update…"); }
     try {
       await neuralPathApi.saveProgress({path_item_id:item.id,status:was?"in_progress":"completed"});
+      const refreshed = await neuralPathApi.getDashboard();
+      applyDashboard(refreshed, item.path_id);
       notify(was?"Progress updated in your account.":"Progress saved to your account.");
     } catch(cause) {
       setChecked(v=>({...v,[key]:was}));
-      setXp(v=>Math.max(0,v+(was?task.xp:-task.xp)));
       notify(cause instanceof Error?cause.message:"Unable to save progress. Please retry.");
     }
   }
   function finishDay() {
     if(doneTasks<day.tasks.length){notify("Complete all daily tasks before claiming the day.");return;}
-    if(!completed.includes(activeDay)){setCompleted(v=>[...v,activeDay]);setXp(v=>v+50);notify("Day completed! +50 bonus XP and a new step forward.");}
-    else notify("This day is already in your completed record.");
+    if(!completed.includes(activeDay)){notify("All tasks are saved. Refreshing your completed-day total…");}
+    else notify("This day is already in your saved progress.");
   }
   const badges = [
     {name:"First commit",desc:"Complete your first learning day",icon:Code2,earned:completed.length>=1},
@@ -211,7 +221,7 @@ export default function Home() {
       <div className="workspace-label">YOUR JOURNEY</div>
       <div className="side-progress"><div className="side-progress-top"><span>Overall progress</span><b>{progress}%</b></div><div className="progress-track"><i style={{width:`${progress}%`}}/></div><small>{completed.length} of 45 days completed</small></div>
       <div className="phase-menu">{phases.map((p,i)=><button key={p.name} onClick={()=>{setActiveDay(Number(p.range.slice(0,2)));setTab("roadmap");setMenuOpen(false)}} className="phase-link"><span className={`phase-dot ${p.tone}`}/><span>{p.name}</span><small>{p.range}</small></button>)}</div>
-      <div className="sidebar-bottom"><div className="streak-card"><div className="streak-icon"><Flame size={18}/></div><div><b>{streak} day streak</b><small>Keep your momentum alive</small></div><Sparkles size={16} className="streak-spark"/></div><div className="profile-row"><div className="avatar">DS</div><div><b>Dhruv Savaliya</b><small>Level {level} · AI Engineer in progress</small></div><ChevronDown size={16}/></div><form action={signOut} className="signout-form"><button type="submit">Sign out</button></form></div>
+      <div className="sidebar-bottom"><div className="streak-card"><div className="streak-icon"><Flame size={18}/></div><div><b>{streak} day streak</b><small>Keep your momentum alive</small></div><Sparkles size={16} className="streak-spark"/></div><div className="profile-row"><div className="avatar">DS</div><div><b>{profileName}</b><small>Level {level} · AI Engineer in progress</small></div><ChevronDown size={16}/></div><form action={signOut} className="signout-form"><button type="submit">Sign out</button></form></div>
     </aside>
     {menuOpen&&<div className="mobile-scrim" onClick={()=>setMenuOpen(false)}/>}
     <section className="main-area">
