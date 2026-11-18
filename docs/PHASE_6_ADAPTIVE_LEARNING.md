@@ -73,7 +73,7 @@ Capture whether a recommendation was helpful, ignored or dismissed, with minimal
 ## Provider and cost policy
 
 - Use the configured Gemini primary provider only when its free quota is available.
-- Keep Groq GPT-OSS 120B disabled by default; it is token-priced and is not an assumed free fallback.
+- Use Groq GPT-OSS 120B only as the configured transient-failure fallback. It activates when `GROQ_API_KEY` exists unless `GROQ_ENABLED=false`; respect the account's developer-plan rate limits and never assume unlimited free usage.
 - Reuse Cloudflare BGE-M3 and Supabase pgvector only where personal knowledge retrieval materially improves a recommendation.
 - Do not add a paid vector database, queue, analytics vendor or hosted model.
 - If AI is unavailable, show a clearly labelled deterministic next-task suggestion based on saved database records. Do not present it as an AI-generated response.
