@@ -99,7 +99,7 @@ export default function LearnerInsightsPanel() {
                   <div style={{ display: "grid", gap: 8 }}>
                     {insights.roadmap.nextTasks.slice(0, 3).map(task => (
                       <div key={task.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13 }}>
-                        <span><b>Day {task.day}:</b> {task.title.replace(/^Day \\d+: /, "")}</span>
+                        <span><b>Day {task.day}:</b> {task.title.replace(/^Day \d+: /, "")}</span>
                         <small style={{ color: "var(--muted,#9ca3af)", whiteSpace: "nowrap" }}>{task.status.replaceAll("_", " ")}</small>
                       </div>
                     ))}
