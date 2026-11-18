@@ -1,6 +1,12 @@
 import { Module } from "@nestjs/common";
 import { SupabaseAuthGuard } from "../auth/supabase-auth.guard";
+import { AiModule } from "../ai/ai.module";
 import { PathsController } from "./paths.controller";
 import { PathsService } from "./paths.service";
-@Module({controllers:[PathsController],providers:[PathsService,SupabaseAuthGuard]})
+
+@Module({
+  imports: [AiModule],
+  controllers: [PathsController],
+  providers: [PathsService, SupabaseAuthGuard],
+})
 export class PathsModule {}
