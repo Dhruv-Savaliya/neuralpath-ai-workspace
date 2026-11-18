@@ -29,6 +29,35 @@ export default function LearnerInsightsPanel() {
     }
   }, []);
 
+
+  const respondToRecommendation = async (
+    candidateId: string,
+    action: "accept" | "helpful" | "dismissed",
+  ) => {
+    if (!recommendations?.id) return;
+    setRecommendationBusy(true);
+    setRecommendationMessage("");
+    try {
+      if (action === "accept") {
+        await neuralPathApi.acceptLearningRecommendation(recommendations.id, candidateId);
+        setRecommendationMessage("Recommendation accepted. Your saved preferences were updated only where applicable.");
+      } else {
+        await neuralPathApi.sendRecommendationFeedback(recommendations.id, action);
+        setRecommendationMessage(action === "helpful" ? "Thanks — feedback saved." : "Recommendation dismissed.");
+      }
+      const [nextInsights, nextRecommendations] = await Promise.all([
+        neuralPathApi.getLearnerInsights(),
+        neuralPathApi.getLearningRecommendations(),
+      ]);
+      setInsights(nextInsights);
+      setRecommendations(nextRecommendations);
+    } catch (cause) {
+      setRecommendationMessage(cause instanceof Error ? cause.message : "Unable to save your response.");
+    } finally {
+      setRecommendationBusy(false);
+    }
+  };
+
   useEffect(() => { void load(); }, [load]);
 
   return (
