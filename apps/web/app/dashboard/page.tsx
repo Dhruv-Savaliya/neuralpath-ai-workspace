@@ -182,7 +182,7 @@ export default function Home() {
       detail: dayItems[index].description.split(" — ").slice(1).join(" — ") || task.detail,
     })),
   } : baseDay;
-  const avatarInitials = profileName.trim().split(/\\s+/).slice(0,2).map(part => part[0]?.toUpperCase()).join("") || "L";
+  const avatarInitials = profileName.trim().split(/\s+/).slice(0,2).map(part => part[0]?.toUpperCase()).join("") || "L";
   const doneTasks = day.tasks.filter(t=>checked[`${activeDay}-${t.id}`]).length;
   const progress = Math.round(completed.length/45*100);
   const level = Math.floor(xp/250)+1;
