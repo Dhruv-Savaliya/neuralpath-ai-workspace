@@ -159,13 +159,13 @@ export class PathsService {
         throw new BadRequestException(`AI curriculum day ${startDay + index} is invalid.`);
       }
       const day = candidate as GeneratedDay;
-      if (day.day !== startDay + index || typeof day.title !== "string" || !day.title.trim() ||
-          typeof day.focus !== "string" || !day.focus.trim() || !Array.isArray(day.tasks) || day.tasks.length !== TASKS_PER_DAY) {
+      if (day.day !== startDay + index || typeof day.title !== "string" || !day.title.trim() || day.title.length > 120 ||
+          typeof day.focus !== "string" || !day.focus.trim() || day.focus.length > 300 || !Array.isArray(day.tasks) || day.tasks.length !== TASKS_PER_DAY) {
         throw new BadRequestException(`AI curriculum day ${startDay + index} is incomplete.`);
       }
       day.tasks.forEach(task => {
         if (!task || typeof task !== "object" || typeof task.title !== "string" || !task.title.trim() ||
-            typeof task.description !== "string" || !task.description.trim() ||
+            typeof task.description !== "string" || !task.description.trim() || task.title.length > 160 || task.description.length > 1500 ||
             !["lesson", "exercise", "resource", "project"].includes(task.item_type)) {
           throw new BadRequestException(`AI curriculum day ${startDay + index} contains an invalid task.`);
         }
