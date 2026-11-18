@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { Logger } from "@nestjs/common";
 import {
   BadRequestException,
   Injectable,
@@ -40,6 +41,7 @@ class ProviderError extends Error {
 
 @Injectable()
 export class AiService {
+  private readonly logger = new Logger(AiService.name);
   private readonly dimensions = 1024;
   private readonly model = "@cf/baai/bge-m3";
   private readonly chunkSize = 1200;
@@ -286,29 +288,48 @@ export class AiService {
     const groqKey = this.config.get<string>("GROQ_API_KEY");
     const groqModel = this.config.get<string>("GROQ_MODEL") ?? "openai/gpt-oss-120b";
 
-    const generateWithFallback = async () => {
+    const generateWithFallback = async (primaryFailure?: unknown) => {
       if (!groqEnabled || !groqKey) {
-        throw new ServiceUnavailableException("The primary AI provider failed and Groq fallback is not configured.");
+        const reason = primaryFailure instanceof ProviderError
+          ? ` Gemini returned HTTP ${primaryFailure.status}: ${primaryFailure.message}`
+          : "";
+        throw new ServiceUnavailableException(
+          `Gemini is unavailable and Groq fallback is not enabled or configured.${reason}`,
+        );
       }
       try {
         const answer = await this.generateWithGroq(groqKey, groqModel, prompt, options.jsonMode);
+        this.logger.log(`AI generation completed with Groq fallback (${groqModel}).`);
         return { answer, provider: "groq", model: groqModel };
-      } catch {
-        throw new ServiceUnavailableException("Both configured generation providers are unavailable.");
+      } catch (fallbackError) {
+        const primaryReason = primaryFailure instanceof ProviderError
+          ? `Gemini HTTP ${primaryFailure.status}: ${primaryFailure.message}`
+          : primaryFailure instanceof Error ? primaryFailure.message : "Gemini unavailable";
+        const fallbackReason = fallbackError instanceof ProviderError
+          ? `Groq HTTP ${fallbackError.status}: ${fallbackError.message}`
+          : fallbackError instanceof Error ? fallbackError.message : "Groq unavailable";
+        this.logger.error(`AI provider chain failed. Primary: ${primaryReason}. Fallback: ${fallbackReason}`);
+        throw new ServiceUnavailableException(
+          `AI generation failed. Gemini: ${primaryReason}. Groq: ${fallbackReason}`,
+        );
       }
     };
 
     if (options.preferFallback) return generateWithFallback();
-    if (!geminiKey) throw new ServiceUnavailableException("Gemini API credentials are not configured.");
+    if (!geminiKey) {
+      this.logger.warn("GEMINI_API_KEY is not configured; attempting configured Groq fallback.");
+      return generateWithFallback(new ProviderError("Gemini API key is not configured.", 401));
+    }
 
     try {
       const answer = await this.generateWithGemini(geminiKey, geminiModel, prompt, options.jsonMode);
       return { answer, provider: "gemini", model: geminiModel };
     } catch (error) {
-      if (!(error instanceof ProviderError) || !error.isTransient) {
-        throw new ServiceUnavailableException("Gemini generation failed. Check model availability and API configuration.");
-      }
-      return generateWithFallback();
+      const providerError = error instanceof ProviderError
+        ? error
+        : new ProviderError(error instanceof Error ? error.message : "Unknown Gemini provider error.", 502);
+      this.logger.warn(`Gemini generation failed (HTTP ${providerError.status}); trying Groq fallback.`);
+      return generateWithFallback(providerError);
     }
   }
 
