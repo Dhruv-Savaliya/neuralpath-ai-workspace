@@ -6,5 +6,6 @@ import { AiService } from "./ai.service";
 @Module({
   controllers: [AiController],
   providers: [AiService, SupabaseAuthGuard],
+  exports: [AiService],
 })
 export class AiModule {}
