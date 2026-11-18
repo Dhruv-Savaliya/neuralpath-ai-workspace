@@ -70,7 +70,7 @@ test("Gemini 429 uses the configured Groq GPT-OSS fallback", async () => {
         headers: { "Content-Type": "application/json" },
       });
     }
-    return new Response(JSON.stringify({ choices: [{ message: { content: "{\\"recommendations\\":[]}" } }] }), {
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ recommendations: [] }) } }] }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
