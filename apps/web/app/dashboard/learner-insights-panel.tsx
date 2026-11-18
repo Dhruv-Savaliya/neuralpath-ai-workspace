@@ -16,12 +16,15 @@ export default function LearnerInsightsPanel() {
     setLoading(true);
     setError("");
     try {
-      const [nextInsights, nextRecommendations] = await Promise.all([
-        neuralPathApi.getLearnerInsights(),
-        neuralPathApi.getLearningRecommendations(),
-      ]);
+      const nextInsights = await neuralPathApi.getLearnerInsights();
       setInsights(nextInsights);
-      setRecommendations(nextRecommendations);
+      try {
+        setRecommendations(await neuralPathApi.getLearningRecommendations());
+        setRecommendationMessage("");
+      } catch {
+        setRecommendations(null);
+        setRecommendationMessage("Adaptive recommendations are temporarily unavailable. Your saved learning insights are still available.");
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to load learner insights.");
     } finally {
@@ -45,12 +48,14 @@ export default function LearnerInsightsPanel() {
         await neuralPathApi.sendRecommendationFeedback(recommendations.id, candidateId, action);
         setRecommendationMessage(action === "helpful" ? "Thanks — feedback saved." : "Recommendation dismissed.");
       }
-      const [nextInsights, nextRecommendations] = await Promise.all([
-        neuralPathApi.getLearnerInsights(),
-        neuralPathApi.getLearningRecommendations(),
-      ]);
+      const nextInsights = await neuralPathApi.getLearnerInsights();
       setInsights(nextInsights);
-      setRecommendations(nextRecommendations);
+      try {
+        setRecommendations(await neuralPathApi.getLearningRecommendations());
+      } catch {
+        setRecommendations(null);
+        setRecommendationMessage("Your response was saved, but fresh recommendations are temporarily unavailable.");
+      }
     } catch (cause) {
       setRecommendationMessage(cause instanceof Error ? cause.message : "Unable to save your response.");
     } finally {
