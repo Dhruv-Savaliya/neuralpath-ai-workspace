@@ -113,7 +113,7 @@ test("recordFeedback only updates a recommendation owned by the authenticated le
   const service = new LearningService({ generateForLearning: async () => { throw new Error("not used"); } });
   const result = await service.recordFeedback(learnerRequest(db), "recommendation-a", { candidateId: "pace:weekly-minutes", feedback: "helpful" });
 
-  assert.deepEqual(result, { saved: true, feedback: "helpful" });
+  assert.deepEqual(result, { saved: true, feedback: "helpful", candidateId: "pace:weekly-minutes" });
   assert.ok(db.calls.some(call => call.table === "learning_recommendations" && call.method === "eq" && call.column === "user_id" && call.value === "learner-a"));
 });
 
