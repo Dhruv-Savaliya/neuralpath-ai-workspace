@@ -86,10 +86,10 @@ export class DashboardService {
     let xp = 0;
     let completedDays = 0;
     for (const path of pathRows) {
-      const completedPositions = new Set(
+      const completedPositions = new Set<number>(
         path.items
-          .filter((item) => item.progress === "completed")
-          .map((item) => item.position),
+          .filter((item: { progress: string }) => item.progress === "completed")
+          .map((item: { position: number }) => item.position),
       );
       for (const position of completedPositions) xp += TASK_XP[position % 4] ?? 0;
       for (let day = 0; day < 45; day += 1) {
