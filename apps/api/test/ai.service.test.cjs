@@ -103,3 +103,62 @@ test("Gemini 429 uses the configured Groq GPT-OSS fallback", async () => {
     global.fetch = originalFetch;
   }
 });
+
+
+test("Gemini model/configuration errors also attempt the explicitly enabled Groq fallback", async () => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push(String(url));
+    if (String(url).includes("generativelanguage.googleapis.com")) {
+      return new Response(JSON.stringify({ error: { message: "model not found for this API key" } }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ choices: [{ message: { content: "valid fallback response" } }] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    const config = { get(key) {
+      return ({
+        GEMINI_API_KEY: "test-gemini-key",
+        GEMINI_MODEL: "invalid-model-for-test",
+        GROQ_API_KEY: "test-groq-key",
+        GROQ_MODEL: "openai/gpt-oss-120b",
+        GROQ_ENABLED: "true",
+      })[key];
+    }};
+    const service = new AiService(config);
+    const result = await service.generate("test prompt");
+    assert.equal(result.provider, "groq");
+    assert.equal(calls.length, 2);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("Gemini failure preserves provider reason when Groq is disabled", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => new Response(JSON.stringify({ error: { message: "invalid model" } }), {
+    status: 404, headers: { "Content-Type": "application/json" },
+  });
+  try {
+    const config = { get(key) {
+      return ({
+        GEMINI_API_KEY: "test-gemini-key",
+        GEMINI_MODEL: "invalid-model-for-test",
+        GROQ_ENABLED: "false",
+      })[key];
+    }};
+    const service = new AiService(config);
+    await assert.rejects(
+      () => service.generate("test prompt"),
+      error => error.status === 503 && /Gemini returned HTTP 404: invalid model/.test(error.message),
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
