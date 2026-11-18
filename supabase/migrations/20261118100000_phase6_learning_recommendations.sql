@@ -5,6 +5,7 @@ create table if not exists public.learning_recommendations (
   user_id uuid not null references auth.users(id) on delete cascade,
   payload jsonb not null check (jsonb_typeof(payload) = 'object'),
   feedback text check (feedback in ('helpful', 'dismissed')),
+  feedback_candidate_id text,
   accepted_at timestamptz,
   accepted_action jsonb,
   created_at timestamptz not null default now(),
