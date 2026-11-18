@@ -256,7 +256,7 @@ export class AiService {
 
   private async generate(prompt: string): Promise<{ answer: string; provider: string; model: string }> {
     const geminiKey = this.config.get<string>("GEMINI_API_KEY");
-    const geminiModel = this.config.get<string>("GEMINI_MODEL") ?? "gemini-3.7-flash";
+    const geminiModel = this.config.get<string>("GEMINI_MODEL") ?? "gemini-3.8-flash";
     if (!geminiKey) throw new ServiceUnavailableException("Gemini API credentials are not configured.");
 
     try {
@@ -266,10 +266,10 @@ export class AiService {
       if (!(error instanceof ProviderError) || !error.isTransient) {
         throw new ServiceUnavailableException("Gemini generation failed. Check model availability and API configuration.");
       }
-      const groqEnabled = this.config.get<string>("GROQ_ENABLED") === "true";
+      const groqEnabled = this.config.get<string>("GROQ_ENABLED") !== "false";
       const groqKey = this.config.get<string>("GROQ_API_KEY");
       if (!groqEnabled || !groqKey) {
-        throw new ServiceUnavailableException("Gemini is temporarily unavailable. Groq fallback is disabled to prevent unexpected API charges.");
+        throw new ServiceUnavailableException("Gemini is temporarily unavailable. Configure GROQ_API_KEY and enable Groq fallback to continue.");
       }
       const groqModel = this.config.get<string>("GROQ_MODEL") ?? "openai/gpt-oss-120b";
       try {
