@@ -281,9 +281,23 @@ export class LearningService {
   }
 
   async recordFeedback(req: AuthenticatedRequest, id: string, dto: RecommendationFeedbackDto) {
+    const existing = await req.supabase
+      .from("learning_recommendations")
+      .select("id,payload,accepted_at,feedback")
+      .eq("id", id)
+      .eq("user_id", req.user.id)
+      .maybeSingle();
+    if (existing.error) throw new InternalServerErrorException("Unable to load recommendation feedback target.");
+    if (!existing.data || existing.data.accepted_at || existing.data.feedback) {
+      throw new NotFoundException("Recommendation was not found or is no longer actionable.");
+    }
+    const candidates = (existing.data.payload as { recommendations?: RecommendationCandidate[] }).recommendations ?? [];
+    if (!candidates.some(candidate => candidate.candidateId === dto.candidateId)) {
+      throw new BadRequestException("Feedback does not match a saved recommendation.");
+    }
     const result = await req.supabase
       .from("learning_recommendations")
-      .update({ feedback: dto.feedback })
+      .update({ feedback: dto.feedback, feedback_candidate_id: dto.candidateId })
       .eq("id", id)
       .eq("user_id", req.user.id)
       .is("accepted_at", null)
@@ -291,8 +305,8 @@ export class LearningService {
       .select("id")
       .maybeSingle();
     if (result.error) throw new InternalServerErrorException("Unable to save recommendation feedback.");
-    if (!result.data) throw new NotFoundException("Recommendation was not found or already accepted.");
-    return { saved: true, feedback: dto.feedback };
+    if (!result.data) throw new NotFoundException("Recommendation was not found or already responded to.");
+    return { saved: true, feedback: dto.feedback, candidateId: dto.candidateId };
   }
 
   async acceptRecommendation(req: AuthenticatedRequest, id: string, dto: AcceptRecommendationDto) {
@@ -354,6 +368,7 @@ export class LearningService {
       .eq("id", id)
       .eq("user_id", req.user.id)
       .is("accepted_at", null)
+      .is("feedback", null)
       .select("id")
       .maybeSingle();
     if (accepted.error || !accepted.data) throw new InternalServerErrorException("Unable to record recommendation approval.");
