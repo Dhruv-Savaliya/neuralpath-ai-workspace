@@ -104,3 +104,48 @@ test("getRecommendations rejects model-invented candidate identifiers and falls 
   assert.equal(result.source, "deterministic");
   assert.equal(result.recommendations[0].taskId, "task-b");
 });
+
+
+test("recordFeedback only updates a recommendation owned by the authenticated learner", async () => {
+  const db = makeDb({
+    learning_recommendations: { data: { id: "recommendation-a" }, error: null },
+  });
+  const service = new LearningService({ generateForLearning: async () => { throw new Error("not used"); } });
+  const result = await service.recordFeedback(learnerRequest(db), "recommendation-a", { feedback: "helpful" });
+
+  assert.deepEqual(result, { saved: true, feedback: "helpful" });
+  assert.ok(db.calls.some(call => call.table === "learning_recommendations" && call.method === "eq" && call.column === "user_id" && call.value === "learner-a"));
+});
+
+test("acceptRecommendation validates task ownership before recording learner approval", async () => {
+  const taskId = "00000000-0000-4000-8000-000000000001";
+  const db = makeDb({
+    learning_recommendations: {
+      data: {
+        id: "recommendation-a",
+        payload: { recommendations: [{
+          candidateId: `task:${taskId}`,
+          kind: "focus_task",
+          taskId,
+          goalId: "goal-a",
+          title: "Continue Python",
+          actionValue: null,
+          estimatedMinutes: 45,
+          reason: "This is next.",
+          priority: 1,
+        }] },
+        accepted_at: null,
+        feedback: null,
+      },
+      error: null,
+    },
+    learning_path_items: { data: { id: taskId, status: "not_started" }, error: null },
+    learning_progress: { data: null, error: null },
+  });
+  const service = new LearningService({ generateForLearning: async () => { throw new Error("not used"); } });
+  const result = await service.acceptRecommendation(learnerRequest(db), "recommendation-a", { candidateId: `task:${taskId}` });
+
+  assert.deepEqual(result, { accepted: true, action: "focus_task" });
+  assert.ok(db.calls.some(call => call.table === "learning_path_items" && call.method === "eq" && call.column === "user_id" && call.value === "learner-a"));
+  assert.ok(db.calls.some(call => call.table === "learning_recommendations" && call.method === "eq" && call.column === "user_id" && call.value === "learner-a"));
+});
