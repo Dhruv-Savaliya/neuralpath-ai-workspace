@@ -22,11 +22,6 @@ jobs:
         run: npm install
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
-      - name: Check current patched utility releases
-        run: |
-          npm view picomatch version
-          npm view glob version
-          npm view minimatch version
       - name: Audit development dependencies (non-blocking)
         continue-on-error: true
         run: npm audit --audit-level=high
