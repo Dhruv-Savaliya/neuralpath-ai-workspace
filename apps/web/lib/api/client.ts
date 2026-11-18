@@ -46,6 +46,9 @@ export type WorkspaceDashboard = {
     completedItems: number;
     progressPercent: number;
     completedThisWeek: number;
+    completedDays: number;
+    currentStreak: number;
+    xp: number;
   };
 };
 
