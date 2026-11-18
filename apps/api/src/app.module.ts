@@ -6,6 +6,7 @@ import { AiModule } from "./ai/ai.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { GoalsModule } from "./goals/goals.module";
 import { HealthController } from "./health/health.controller";
+import { LearningModule } from "./learning/learning.module";
 import { PathsModule } from "./paths/paths.module";
 import { ProfileModule } from "./profile/profile.module";
 import { ProgressModule } from "./progress/progress.module";
@@ -20,6 +21,7 @@ import { ProgressModule } from "./progress/progress.module";
     AiModule,
     DashboardModule,
     GoalsModule,
+    LearningModule,
     ProfileModule,
     ProgressModule,
     PathsModule,
