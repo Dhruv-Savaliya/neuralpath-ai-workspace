@@ -106,7 +106,7 @@ export class PathsService {
     }
 
     const curriculum: GeneratedCurriculum = {
-      title: `${goal.title.trim()} — 45-day personalized learning path`,
+      title: `${goal.title.trim()} — 45-day learning path`,
       description: `A personalized 45-day learning plan for ${goal.title}, generated from your onboarding profile, preferences, current level and desired outcome.`,
       days,
     };
