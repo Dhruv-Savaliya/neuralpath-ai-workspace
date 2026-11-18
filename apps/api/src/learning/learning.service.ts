@@ -282,6 +282,7 @@ export class LearningService {
       .eq("id", id)
       .eq("user_id", req.user.id)
       .is("accepted_at", null)
+      .is("feedback", null)
       .select("id")
       .maybeSingle();
     if (result.error) throw new InternalServerErrorException("Unable to save recommendation feedback.");
