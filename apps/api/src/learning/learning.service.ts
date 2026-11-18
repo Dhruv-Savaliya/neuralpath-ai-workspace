@@ -242,9 +242,14 @@ export class LearningService {
         weeklyMinutes: preferences?.weekly_minutes ?? null,
         learningFormats: preferences?.learning_formats ?? [],
         language: preferences?.language_code ?? "en",
-        goals: goals.map(goal => ({ id: goal.id, title: goal.title, priority: goal.priority, targetDate: goal.target_date })),
+        activeGoalCount: goals.length,
+        goalPriorities: goals.map(goal => ({ category: goal.category, priority: goal.priority, daysToTarget: goal.target_date
+          ? Math.ceil((new Date(`${goal.target_date}T00:00:00Z`).getTime() - now) / 86400000)
+          : null })),
         recentCompletions: completedDates.length,
-        candidates,
+        candidates: candidates.map(({ candidateId, kind, title, estimatedMinutes }) => ({
+          candidateId, kind, title, estimatedMinutes,
+        })),
       }),
     ].join("\n");
 
