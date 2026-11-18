@@ -42,7 +42,7 @@ export default function LearnerInsightsPanel() {
         await neuralPathApi.acceptLearningRecommendation(recommendations.id, candidateId);
         setRecommendationMessage("Recommendation accepted. Your saved preferences were updated only where applicable.");
       } else {
-        await neuralPathApi.sendRecommendationFeedback(recommendations.id, action);
+        await neuralPathApi.sendRecommendationFeedback(recommendations.id, candidateId, action);
         setRecommendationMessage(action === "helpful" ? "Thanks — feedback saved." : "Recommendation dismissed.");
       }
       const [nextInsights, nextRecommendations] = await Promise.all([
