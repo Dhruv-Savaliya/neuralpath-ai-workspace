@@ -36,7 +36,7 @@ export class LearningController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   accept(
     @Req() req: AuthenticatedRequest,
-    @Param("id") id: string,
+    @Param("id", new ParseUUIDPipe()) id: string,
     @Body() dto: AcceptRecommendationDto,
   ) {
     return this.learning.acceptRecommendation(req, id, dto);
