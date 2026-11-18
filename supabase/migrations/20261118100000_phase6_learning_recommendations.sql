@@ -1,5 +1,11 @@
 begin;
 
+alter table if exists public.ai_usage_events
+  add column if not exists latency_ms integer check (latency_ms is null or latency_ms >= 0);
+
+alter table if exists public.ai_usage_events
+  add column if not exists error_code text;
+
 create table if not exists public.learning_recommendations (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
