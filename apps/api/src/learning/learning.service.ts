@@ -14,6 +14,7 @@ import {
   type RecommendationCandidate,
 } from "./learning.logic";
 import type { RecommendationFeedbackDto } from "./dto/recommendation-feedback.dto";
+import type { AcceptRecommendationDto } from "./dto/accept-recommendation.dto";
 
 const PHASES = [
   { name: "Python foundations", firstDay: 1, lastDay: 7 },
@@ -261,7 +262,7 @@ export class LearningService {
     return { saved: true, feedback: dto.feedback };
   }
 
-  async acceptRecommendation(req: AuthenticatedRequest, id: string) {
+  async acceptRecommendation(req: AuthenticatedRequest, id: string, dto: AcceptRecommendationDto) {
     const result = await req.supabase
       .from("learning_recommendations")
       .select("id,payload,accepted_at,feedback")
@@ -274,7 +275,7 @@ export class LearningService {
     }
 
     const recommendations = (result.data.payload as { recommendations?: Array<RecommendationCandidate & { reason: string; priority: number }> }).recommendations ?? [];
-    const candidate = recommendations[0];
+    const candidate = recommendations.find(item => item.candidateId === dto.candidateId);
     if (!candidate) throw new BadRequestException("This recommendation has no action to accept.");
 
     if (candidate.kind === "adjust_weekly_minutes") {
