@@ -26,6 +26,32 @@ const PHASES = [
   { name: "Portfolio & shipping", firstDay: 39, lastDay: 45 },
 ] as const;
 
+function weeklyActivity(values: string[], timeZone: string, now: number) {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    const dateParts = new Intl.DateTimeFormat("en-CA", {
+      timeZone, year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(new Date(value));
+    const fields = Object.fromEntries(dateParts.map(part => [part.type, part.value]));
+    const localDate = new Date(Date.UTC(Number(fields.year), Number(fields.month) - 1, Number(fields.day)));
+    localDate.setUTCDate(localDate.getUTCDate() - ((localDate.getUTCDay() + 6) % 7));
+    const weekStart = localDate.toISOString().slice(0, 10);
+    counts.set(weekStart, (counts.get(weekStart) ?? 0) + 1);
+  }
+  const currentParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date(now));
+  const fields = Object.fromEntries(currentParts.map(part => [part.type, part.value]));
+  const monday = new Date(Date.UTC(Number(fields.year), Number(fields.month) - 1, Number(fields.day)));
+  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+  return Array.from({ length: 6 }, (_, index) => {
+    const start = new Date(monday);
+    start.setUTCDate(start.getUTCDate() - (5 - index) * 7);
+    const weekStart = start.toISOString().slice(0, 10);
+    return { weekStart, completedTasks: counts.get(weekStart) ?? 0 };
+  });
+}
+
 @Injectable()
 export class LearningService {
   constructor(private readonly ai: AiService) {}
@@ -146,6 +172,7 @@ export class LearningService {
       activity: {
         completedLast7Days: countWithinDays(completedDates, 7, now),
         completedLast30Days: countWithinDays(completedDates, 30, now),
+        weekly: weeklyActivity(completedDates, timeZone, now),
         currentStreak: streakFromDates(completedDates, timeZone, new Date(now)),
         lastCompletedAt: completedDates.length
           ? Math.max(...completedDates.map(date => new Date(date).getTime()))
@@ -295,11 +322,22 @@ export class LearningService {
     } else if (candidate.kind === "focus_task") {
       const owned = await req.supabase
         .from("learning_path_items")
-        .select("id")
+        .select("id,status")
         .eq("id", candidate.taskId)
         .eq("user_id", req.user.id)
         .maybeSingle();
-      if (owned.error || !owned.data) throw new NotFoundException("The recommended task is no longer available.");
+      if (owned.error || !owned.data || owned.data.status === "completed") {
+        throw new NotFoundException("The recommended task is no longer available.");
+      }
+      const savedProgress = await req.supabase
+        .from("learning_progress")
+        .select("status")
+        .eq("path_item_id", candidate.taskId)
+        .eq("user_id", req.user.id)
+        .maybeSingle();
+      if (savedProgress.error || savedProgress.data?.status === "completed") {
+        throw new NotFoundException("This task is already completed.");
+      }
     } else {
       throw new BadRequestException("Unsupported recommendation action.");
     }
