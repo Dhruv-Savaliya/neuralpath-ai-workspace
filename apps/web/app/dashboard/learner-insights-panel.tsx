@@ -69,6 +69,24 @@ export default function LearnerInsightsPanel() {
             })}
           </div>
 
+          <div style={{ marginBottom: 16 }}>
+            <b style={{ fontSize: 13 }}>Weekly consistency</b>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6,minmax(0,1fr))", gap: 8, marginTop: 9 }}>
+              {insights.activity.weekly.map(week => {
+                const max = Math.max(1, ...insights.activity.weekly.map(item => item.completedTasks));
+                return (
+                  <div key={week.weekStart} title={`${week.weekStart}: ${week.completedTasks} completed`} style={{ textAlign: "center" }}>
+                    <div style={{ height: 42, display: "flex", alignItems: "end", background: "var(--border,rgba(148,163,184,.12))", borderRadius: 5, overflow: "hidden" }}>
+                      <div style={{ width: "100%", height: `${Math.max(4, week.completedTasks / max * 100)}%`, background: "var(--accent,#8b5cf6)" }}/>
+                    </div>
+                    <small style={{ color: "var(--muted,#9ca3af)", fontSize: 9 }}>{new Date(week.weekStart + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</small>
+                    <b style={{ display: "block", fontSize: 11 }}>{week.completedTasks}</b>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {!insights.hasActivity ? (
             <p style={{ color: "var(--muted,#9ca3af)", fontSize: 13, margin: "0 0 16px" }}>
               No completed learning activity has been saved yet. Complete a roadmap task and your activity trends will appear here.
