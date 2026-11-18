@@ -70,7 +70,8 @@ test("bootstrap generates nine validated batches and persists exactly 180 ordere
   };
   const path = { id: "path-1", title: "Full-stack development — 45-day personalized learning path" };
   let insertedItems = [];
-  let batchCalls = 0;\n  let firstPrompt = "";
+  let batchCalls = 0;
+  let firstPrompt = "";
 
   const db = {
     from(table) {
@@ -104,7 +105,8 @@ test("bootstrap generates nine validated batches and persists exactly 180 ordere
   };
 
   const ai = {
-    async generateForLearning(_req, _prompt, options) {\n      if (!firstPrompt) firstPrompt = _prompt;
+    async generateForLearning(_req, _prompt, options) {
+      if (!firstPrompt) firstPrompt = _prompt;
       assert.equal(options.jsonMode, true);
       assert.equal(options.preferFallback, false);
       batchCalls += 1;
@@ -115,7 +117,8 @@ test("bootstrap generates nine validated batches and persists exactly 180 ordere
   const service = new PathsService(ai);
   const result = await service.bootstrap({ user: { id: "learner-1" }, supabase: db }, { goal_id: goal.id });
 
-  assert.equal(batchCalls, 9);\n  assert.match(firstPrompt, /founder/);\n  assert.match(firstPrompt, /business/);\n  assert.match(firstPrompt, /intensive/);\n  assert.match(firstPrompt, /hands_on_projects/);\n  assert.match(firstPrompt, /universal learning and career curriculum architect/);
+  assert.equal(batchCalls, 9);
+  assert.match(firstPrompt, /founder/);\n  assert.match(firstPrompt, /business/);\n  assert.match(firstPrompt, /intensive/);\n  assert.match(firstPrompt, /hands_on_projects/);\n  assert.match(firstPrompt, /universal learning and career curriculum architect/);
   assert.equal(result.items.length, 180);
   assert.equal(result.generation.days, 45);
   assert.equal(result.generation.tasks, 180);
