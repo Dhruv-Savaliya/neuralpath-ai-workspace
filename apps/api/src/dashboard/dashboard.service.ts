@@ -101,7 +101,12 @@ export class DashboardService {
       }
     }
 
-    const timezone = profile.data?.timezone || "Asia/Kolkata";
+    let timezone = profile.data?.timezone || "Asia/Kolkata";
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+    } catch {
+      timezone = "Asia/Kolkata";
+    }
     const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const completedThisWeek = (progress.data ?? []).filter(
       (entry) =>
