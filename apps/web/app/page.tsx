@@ -5,9 +5,8 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight, ArrowUpRight, BookOpen, BrainCircuit, Check, Code2,
-  Compass, GraduationCap, Layers3, Lightbulb, LockKeyhole, Menu,
+  Compass, Layers3, Lightbulb, LockKeyhole,
   Palette, Play, Rocket, Sparkles, Target, TrendingUp, WandSparkles,
-  Zap,
 } from "lucide-react";
 import { Shell } from "./components/marketing";
 
