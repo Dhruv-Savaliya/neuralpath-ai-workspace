@@ -490,3 +490,54 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .np-inline-error button{flex:none}
 @media(max-width:760px){.np-profile-skeleton{grid-template-columns:1fr}.np-insights-skeleton>div:first-child{grid-template-columns:repeat(2,minmax(0,1fr))}.np-content{padding-left:12px;padding-right:12px}.np-topbar{gap:8px}.np-date{display:none}.np-top-actions{gap:8px}.np-welcome{align-items:flex-start}.np-today-chip{flex:none}.np-kpi-grid{gap:9px}.np-kpi{padding:13px;min-width:0}.np-panel{padding:16px!important}.np-roadmap-summary{gap:12px;flex-wrap:wrap}.np-roadmap-summary>div:first-child{min-width:0}.np-roadmap-summary h2,.np-day-head h2{overflow-wrap:anywhere}.np-day-footer{flex-wrap:wrap}.np-day-footer>span{order:3;width:100%;text-align:center}.np-task{gap:10px}.np-task>div{min-width:0}.np-task p{overflow-wrap:anywhere}.np-path-switcher{max-width:100%;overflow-x:auto}.np-path-switcher button{flex:none;max-width:85vw;white-space:normal}.np-page-heading h1{font-size:clamp(30px,8vw,42px)}.np-panel-head{gap:10px;flex-wrap:wrap}.np-panel-head>div{min-width:0}.np-footer{gap:8px}.np-footer span{max-width:100%;overflow-wrap:anywhere}}
 @media(max-width:390px){.np-content{padding-left:9px;padding-right:9px}.np-kpi{padding:11px}.np-kpi b{font-size:18px}.np-welcome h1{font-size:27px}.np-top-actions{gap:5px}.np-refresh,.np-top-avatar{width:34px;height:34px}.np-day-footer button{font-size:10px;padding:0 9px}.np-profile-skeleton{gap:10px}}
+
+
+/* Mobile navigation + viewport containment fixes (Nov 2026) */
+@media(max-width:760px){
+  html,body{width:100%;max-width:100%;overflow-x:clip}
+  .site-header{position:sticky;top:0;z-index:100;isolation:isolate}
+  .site-header .mobile-nav-toggle{display:grid;flex:none;position:relative;z-index:3}
+  .site-header .mobile-nav-panel{
+    display:grid!important;position:absolute;top:calc(100% + 8px);left:12px;right:12px;z-index:110;width:auto;
+    max-height:calc(100dvh - 92px - env(safe-area-inset-bottom));overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
+    padding:10px;border:1px solid rgba(169,154,255,.34);border-radius:15px;background:rgba(15,23,39,.98);
+    box-shadow:0 22px 65px rgba(0,0,0,.62),0 0 35px rgba(137,120,245,.12);
+    backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)
+  }
+  .site-header .mobile-nav-panel a{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:48px;padding:0 14px;border-radius:9px;color:#dce4f4;font-size:13px;text-decoration:none;overflow-wrap:anywhere}
+  .site-header .mobile-nav-panel a:focus-visible,.site-header .mobile-nav-toggle:focus-visible{outline:2px solid #8de6f3;outline-offset:3px}
+  .site-header .mobile-nav-panel a:hover{background:rgba(255,255,255,.07)}
+  .site-header .mobile-nav-panel .mobile-nav-cta{min-height:48px;margin-top:7px;background:linear-gradient(100deg,#b4a8ff,#79d7e8);color:#101629;font-weight:800}
+  .hero,.personal-section,.section-wrap,.steps-section,.disciplines-section,.audience-section{min-width:0;max-width:100%}
+  .hero{overflow:hidden}
+  .hero-copy,.personal-copy,.profile-visual{min-width:0;max-width:100%}
+  .hero-art{min-width:0;max-width:100%;overflow:visible}
+  .hero-node{max-width:calc(100% - 8px);min-width:0}
+  .hero-node>div{min-width:0}
+  .hero-node b,.hero-node small{overflow-wrap:anywhere}
+  .node-two{right:2px}
+  .audience-grid,.discipline-grid,.steps-grid{min-width:0}
+  .audience-card,.discipline-card,.step-card{min-width:0;overflow-wrap:anywhere}
+  .personal-section{grid-template-columns:minmax(0,1fr);overflow:hidden}
+  .profile-visual{width:100%;justify-self:stretch}
+  .profile-window{width:100%;max-width:100%;transform:none}
+  .profile-window-body,.profile-choice,.profile-choice>div{min-width:0}
+}
+@media(max-width:420px){
+  .site-header{padding-left:14px;padding-right:14px}
+  .hero{padding-left:18px;padding-right:18px}
+  .hero-art{width:100%;height:285px}
+  .hero-node{gap:6px;padding:8px}
+  .hero-node b{font-size:7px}
+  .hero-node small{font-size:5.5px;letter-spacing:.8px}
+  .node-two{right:0}
+  .audience-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .audience-card{padding:15px 12px;min-height:180px}
+  .audience-card h3{font-size:11px;overflow-wrap:anywhere}
+  .audience-card p{font-size:9px;overflow-wrap:anywhere}
+  .personal-section{padding-left:18px;padding-right:18px}
+  .profile-window-body{padding:16px}
+  .window-top{padding:0 12px}
+  .window-top b{font-size:6px;letter-spacing:.8px}
+}
+@media(prefers-reduced-motion:reduce){.site-header .mobile-nav-panel{scroll-behavior:auto}}
