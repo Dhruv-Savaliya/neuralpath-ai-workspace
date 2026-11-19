@@ -50,7 +50,7 @@ export default function WorkspaceProfilePanel() {
 
   return <section className="panel" style={{marginBottom:24,padding:22}}>
     <div className="panel-head"><div><span className="section-eyebrow">YOUR LEARNING PROFILE</span><h3>Personalize your workspace</h3></div><UserRound size={18}/></div>
-    {loading ? <p role="status"><LoaderCircle size={15}/> Loading profile…</p> : <form onSubmit={submit} className="workspace-profile-form">
+    {loading ? <div className="np-profile-skeleton" role="status" aria-label="Loading profile">{[1,2,3,4,5].map(n=><div key={n}><span className="np-skeleton np-skeleton-line short"/><span className="np-skeleton np-skeleton-block"/></div>)}</div> : <form onSubmit={submit} className="workspace-profile-form">
       <label>Display name<input value={name} onChange={e=>setName(e.target.value)} maxLength={80}/></label>
       <label>Profession<select value={profession} onChange={e=>setProfession(e.target.value)}>{professions.map(v=><option key={v} value={v}>{v.replaceAll("_"," ")}</option>)}</select></label>
       <label>Experience level<select value={level} onChange={e=>setLevel(e.target.value)}>{levels.map(v=><option key={v} value={v}>{v.replaceAll("_"," ")}</option>)}</select></label>
@@ -58,7 +58,7 @@ export default function WorkspaceProfilePanel() {
       <label>Timezone<input value={timezone} onChange={e=>setTimezone(e.target.value)} maxLength={80}/></label>
       <button className="primary-btn" type="submit" disabled={saving}>{saving?<LoaderCircle size={15}/>:<Save size={15}/>} Save profile</button>
     </form>}
-    {error&&<p role="alert" style={{color:"#f59e0b"}}>{error}</p>}
+    {error&&<div className="np-inline-error" role="alert"><span>{error}</span><button type="button" className="text-btn" onClick={()=>window.location.reload()}>Retry</button></div>}
     {notice&&<p role="status" style={{color:"#34d399"}}>{notice}</p>}
   </section>;
 }

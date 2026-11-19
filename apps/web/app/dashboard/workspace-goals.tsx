@@ -59,7 +59,7 @@ export default function WorkspaceGoalsPanel() {
 
   return <section className="panel" style={{marginBottom:24,padding:22}}>
     <div className="panel-head"><div><span className="section-eyebrow">CLOUD-SAVED WORKSPACE</span><h3>Your learning goals</h3></div><button className="text-btn" type="button" onClick={()=>void load()} disabled={loading}><RefreshCw size={14}/> Refresh</button></div>
-    {loading&&!data?<p role="status"><LoaderCircle size={16}/> Loading your saved goals…</p>:null}
+    {loading&&!data?<div className="np-inline-skeleton" role="status" aria-label="Loading saved goals">{[1,2].map(n=><div className="np-skeleton-card" key={n}><span className="np-skeleton np-skeleton-line short"/><span className="np-skeleton np-skeleton-line"/><span className="np-skeleton np-skeleton-line"/></div>)}</div>:null}
     {error?<p role="alert" style={{color:"#f59e0b",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><AlertCircle size={16}/> {error}
       <button className="text-btn" type="button" disabled={saving||loading} onClick={()=>{const goal=data?.goals.find(item=>item.id===retryGoalId);if(goal)void createPath(goal);else void load();}}>Retry</button>
     </p>:null}
@@ -78,7 +78,7 @@ export default function WorkspaceGoalsPanel() {
             {goal.paths?.map(path=><p key={path.id} style={{fontSize:12,color:"var(--muted,#9ca3af)",margin:"8px 0 0"}}>{path.title} · {path.items?.filter(item=>item.progress==="completed").length??0}/{path.items?.length??0} tasks complete</p>)}
           </>}
         </article>)}
-      </div>:<p style={{color:"var(--muted,#9ca3af)",marginBottom:18}}>No saved goals yet. Add your first goal below.</p>}
+      </div>:<div className="np-empty-state compact" style={{border:"1px dashed var(--border,rgba(148,163,184,.2))",borderRadius:12,marginBottom:18}}><Target size={22}/><b>Your next chapter starts with one goal</b><span>You haven&apos;t saved a learning goal yet. Add one below and NeuralPath can shape a practical path around it.</span></div>}
     </>:null}
     <form className="workspace-goals-form" onSubmit={submitGoal}>
       <label style={{display:"grid",gap:6,fontSize:13}}>Goal title<input value={title} onChange={e=>setTitle(e.target.value)} maxLength={120} minLength={3} required placeholder="e.g. Learn full-stack development"/></label>

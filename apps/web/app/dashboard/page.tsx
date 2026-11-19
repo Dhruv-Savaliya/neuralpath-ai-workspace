@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { signOut } from "../actions/auth";
 import {
   Activity, ArrowRight, ArrowUpRight, Award, BookOpen, BrainCircuit, CalendarDays,
@@ -86,6 +87,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const refresh = useCallback(async () => {
     const next = await neuralPathApi.getDashboard();
@@ -175,11 +177,29 @@ export default function Home() {
   }
 
   if (loading) return (
-    <main className="np-loading"><div className="np-loading-mark"><BrainCircuit size={27}/></div><LoaderCircle className="np-spin" size={18}/><p>Preparing your learning workspace…</p></main>
+    <main className="np-loading np-loading-screen" aria-busy="true" aria-label="Loading your learning workspace">
+      <div className="np-skeleton-brand"><span className="np-skeleton np-skeleton-icon"/><span className="np-skeleton np-skeleton-line"/></div>
+      <div className="np-skeleton-heading"><span className="np-skeleton np-skeleton-line short"/><span className="np-skeleton np-skeleton-line title"/><span className="np-skeleton np-skeleton-line"/></div>
+      <div className="np-skeleton-grid">{Array.from({length:4},(_,i)=><div className="np-skeleton-card" key={i}><span className="np-skeleton np-skeleton-icon"/><span className="np-skeleton np-skeleton-line short"/><span className="np-skeleton np-skeleton-line"/></div>)}</div>
+      <div className="np-skeleton-panel"><span className="np-skeleton np-skeleton-line short"/><span className="np-skeleton np-skeleton-line title"/><span className="np-skeleton np-skeleton-block"/></div>
+      <p className="np-loading-caption"><LoaderCircle className="np-spin" size={16}/> Preparing your learning workspace…</p>
+    </main>
+  );
+  if (!dashboard) return (
+    <main className="np-loading np-failure-screen">
+      <div className="np-failure-icon"><Activity size={26}/></div>
+      <span className="np-eyebrow"><span/> WORKSPACE CONNECTION</span>
+      <h1>We couldn&apos;t load your workspace.</h1>
+      <p>{error || "Your learning data is safe. Check your connection and try again."}</p>
+      <button className="np-primary" onClick={() => { setLoading(true); setError(""); void refresh().catch(cause => setError(cause instanceof Error ? cause.message : "Unable to load your workspace.")).finally(() => setLoading(false)); }}>
+        <RefreshCw size={15}/> Try again
+      </button>
+      <a href="/auth/sign-in" className="np-text-action">Return to sign in <ArrowRight size={14}/></a>
+    </main>
   );
 
   return (
-    <main className="np-shell">
+    <motion.main className="np-shell" initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.35, ease: "easeOut" }}>
       {mobileNavOpen ? <button className="np-scrim" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)}/> : null}
       <aside className={`np-sidebar ${mobileNavOpen ? "np-sidebar-open" : ""}`}>
         <div className="np-brand">
@@ -328,10 +348,10 @@ export default function Home() {
                   </aside>
                   <section className="np-panel np-day-detail">
                     <div className="np-day-head"><div><small>DAY {String(activeDay).padStart(2, "0")} · {phases.find(phase => activeDay >= phase.firstDay && activeDay <= phase.lastDay)?.name}</small><h2>{dayItems[0]?.title.replace(/^Day\s+\d+\s*:\s*/i, "") || `Day ${activeDay}`}</h2><p>{dayItems[0]?.description || "Your saved learning tasks for this day."}</p></div><span className={dayItems.length && dayItems.every(isDone) ? "done" : ""}>{dayItems.length && dayItems.every(isDone) ? "Completed" : "In progress"}</span></div>
-                    <div className="np-task-list">{dayItems.map((item, index) => <article className={`np-task ${isDone(item) ? "completed" : ""}`} key={item.id}>
+                    <div className="np-task-list">{dayItems.length ? dayItems.map((item, index) => <article className={`np-task ${isDone(item) ? "completed" : ""}`} key={item.id}>
                       <button disabled={savingItem === item.id} aria-label={isDone(item) ? "Mark task incomplete" : "Mark task complete"} onClick={() => void toggle(item)}>{savingItem === item.id ? <LoaderCircle size={16} className="np-spin"/> : isDone(item) ? <CheckCircle2 size={18}/> : <Circle size={18}/>}</button>
                       <div><small>{(item as ApiPathItem & { item_type?: string }).item_type?.replaceAll("_", " ") || `TASK ${index + 1}`}</small><b>{item.title.replace(/^Day\s+\d+\s*:\s*/i, "")}</b><p>{item.description}</p></div>
-                    </article>)}</div>
+                    </article>) : <div className="np-empty-state compact"><BookOpen size={22}/><b>No tasks for this day</b><span>Choose another day from your curriculum, or refresh your learning path.</span><button className="np-text-action" onClick={() => void handleRefresh()} disabled={refreshing}>Refresh path <RefreshCw size={13}/></button></div>}</div>
                     <div className="np-day-footer"><button className="np-secondary" disabled={!days.length || activeDay <= Math.min(...days)} onClick={() => setActiveDay(day => Math.max(Math.min(...days), day - 1))}><ChevronLeft size={15}/> Previous</button><span>{dayItems.filter(isDone).length}/{dayItems.length} tasks complete</span><button className="np-primary small" disabled={!days.length || activeDay >= Math.max(...days)} onClick={() => setActiveDay(day => Math.min(Math.max(...days), day + 1))}>Next day <ChevronRight size={15}/></button></div>
                   </section>
                 </div>
@@ -348,7 +368,7 @@ export default function Home() {
           <footer className="np-footer"><span>NEURALPATH <i>·</i> YOUR LEARNING OS</span><span>Built around your goals. Powered by your progress.</span></footer>
         </div>
       </section>
-    </main>
+    </motion.main>
   );
 }
 
