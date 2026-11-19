@@ -76,7 +76,6 @@ export class AiService {
       throw new InternalServerErrorException("Unable to store knowledge chunks.");
     }
 
-    await this.recordUsage(req, "cloudflare", this.model, "embedding", dto.content.length, 0);
     return {
       source_id: sourceId,
       source_title: dto.title.trim(),
@@ -134,7 +133,6 @@ export class AiService {
   async chat(req: AuthenticatedRequest, dto: ChatDto) {
     const question = dto.question.trim();
     const [queryEmbedding] = await this.embed(req, [question]);
-    await this.recordUsage(req, "cloudflare", this.model, "embedding", question.length, 0);
 
     const { data, error } = await req.supabase.rpc("match_knowledge_chunks", {
       query_embedding: queryEmbedding,
@@ -346,57 +344,52 @@ export class AiService {
     prompt: string,
     options: LearningGenerationOptions = {},
   ): Promise<{ answer: string; provider: string; model: string }> {
-    const geminiKey = this.config.get<string>("GEMINI_API_KEY");
-    const geminiModel = this.config.get<string>("GEMINI_MODEL") ?? "gemini-3.8-flash";
     const groqEnabled = this.config.get<string>("GROQ_ENABLED") !== "false";
     const groqKey = this.config.get<string>("GROQ_API_KEY");
     const groqModel = this.config.get<string>("GROQ_MODEL") ?? "openai/gpt-oss-120b";
+    const geminiKey = this.config.get<string>("GEMINI_API_KEY");
+    const geminiModel = this.config.get<string>("GEMINI_MODEL") ?? "gemini-3.8-flash";
 
-    const generateWithFallback = async (primaryFailure?: unknown) => {
-      if (!groqEnabled || !groqKey) {
-        const reason = primaryFailure instanceof ProviderError
-          ? ` Gemini returned HTTP ${primaryFailure.status}: ${primaryFailure.message}`
-          : "";
-        throw new ServiceUnavailableException(
-          `Gemini is unavailable and Groq fallback is not enabled or configured.${reason}`,
-        );
-      }
+    const providers: Array<{ name: string; model: string; run: () => Promise<string> }> = [];
+    const groq = groqEnabled && groqKey
+      ? { name: "groq", model: groqModel, run: () => this.generateWithGroq(groqKey, groqModel, prompt, options.jsonMode) }
+      : null;
+    const gemini = geminiKey
+      ? { name: "gemini", model: geminiModel, run: () => this.generateWithGemini(geminiKey, geminiModel, prompt, options.jsonMode) }
+      : null;
+
+    // Groq is the normal primary. A malformed-output retry may prefer Gemini
+    // first to avoid repeating the same provider/model response.
+    const ordered = options.preferFallback ? [gemini, groq] : [groq, gemini];
+    providers.push(...ordered.filter((provider): provider is NonNullable<typeof provider> => provider !== null));
+
+    if (!providers.length) {
+      throw new ServiceUnavailableException({
+        code: "AI_PROVIDERS_NOT_CONFIGURED",
+        message: "AI generation is not configured yet. Your saved profile and goals are unchanged.",
+      });
+    }
+
+    const failures: string[] = [];
+    for (const provider of providers) {
       try {
-        const answer = await this.generateWithGroq(groqKey, groqModel, prompt, options.jsonMode);
-        this.logger.log(`AI generation completed with Groq fallback (${groqModel}).`);
-        return { answer, provider: "groq", model: groqModel };
-      } catch (fallbackError) {
-        const primaryReason = primaryFailure instanceof ProviderError
-          ? `Gemini HTTP ${primaryFailure.status}: ${primaryFailure.message}`
-          : primaryFailure instanceof Error ? primaryFailure.message : "Gemini unavailable";
-        const fallbackReason = fallbackError instanceof ProviderError
-          ? `Groq HTTP ${fallbackError.status}: ${fallbackError.message}`
-          : fallbackError instanceof Error ? fallbackError.message : "Groq unavailable";
-        this.logger.error(`AI provider chain failed. Primary: ${primaryReason}. Fallback: ${fallbackReason}`);
-        // Keep provider internals and quota details in server logs only.
-        throw new ServiceUnavailableException({
-          code: "AI_PROVIDERS_TEMPORARILY_UNAVAILABLE",
-          message: "AI generation is temporarily busy. Please wait a minute and try again. Your saved learning goals and profile are unchanged.",
-        });
+        const answer = await provider.run();
+        this.logger.log(`AI generation completed with ${provider.name} (${provider.model}).`);
+        return { answer, provider: provider.name, model: provider.model };
+      } catch (error) {
+        const reason = error instanceof ProviderError
+          ? `HTTP ${error.status}: ${error.message}`
+          : error instanceof Error ? error.message : "Unknown provider error";
+        failures.push(`${provider.name}: ${reason}`);
+        this.logger.warn(`${provider.name} generation failed; trying the next configured provider.`);
       }
-    };
-
-    if (options.preferFallback) return generateWithFallback();
-    if (!geminiKey) {
-      this.logger.warn("GEMINI_API_KEY is not configured; attempting configured Groq fallback.");
-      return generateWithFallback(new ProviderError("Gemini API key is not configured.", 401));
     }
 
-    try {
-      const answer = await this.generateWithGemini(geminiKey, geminiModel, prompt, options.jsonMode);
-      return { answer, provider: "gemini", model: geminiModel };
-    } catch (error) {
-      const providerError = error instanceof ProviderError
-        ? error
-        : new ProviderError(error instanceof Error ? error.message : "Unknown Gemini provider error.", 502);
-      this.logger.warn(`Gemini generation failed (HTTP ${providerError.status}); trying Groq fallback.`);
-      return generateWithFallback(providerError);
-    }
+    this.logger.error(`AI provider chain failed: ${failures.join(" | ")}`);
+    throw new ServiceUnavailableException({
+      code: "AI_PROVIDERS_TEMPORARILY_UNAVAILABLE",
+      message: "AI generation is temporarily busy. Please wait and try again. Your saved learning goals and profile are unchanged.",
+    });
   }
 
   private async generateWithGemini(apiKey: string, model: string, prompt: string, jsonMode = false): Promise<string> {
