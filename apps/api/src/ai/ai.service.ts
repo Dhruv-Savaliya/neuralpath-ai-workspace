@@ -366,25 +366,11 @@ export class AiService {
       model: string,
       run: () => Promise<string>,
     ) => {
-      const dailyRequests = Number(this.config.get<string>(provider === "groq" ? "GROQ_DAILY_REQUEST_LIMIT" : "GEMINI_DAILY_REQUEST_LIMIT")
-        ?? (provider === "groq" ? 900 : 18));
-      const dailyTokens = Number(this.config.get<string>(provider === "groq" ? "GROQ_DAILY_TOKEN_LIMIT" : "GEMINI_DAILY_TOKEN_LIMIT")
-        ?? (provider === "groq" ? 180000 : 100000));
-      const minuteTokens = Number(this.config.get<string>(provider === "groq" ? "GROQ_TPM_LIMIT" : "GEMINI_TPM_LIMIT")
-        ?? (provider === "groq" ? 7000 : 6000));
-      const minuteRequests = Number(this.config.get<string>(provider === "groq" ? "GROQ_RPM_LIMIT" : "GEMINI_RPM_LIMIT")
-        ?? (provider === "groq" ? 25 : 10));
-      const userDailyRequests = Number(this.config.get<string>(provider === "groq" ? "GROQ_USER_DAILY_REQUEST_LIMIT" : "GEMINI_USER_DAILY_REQUEST_LIMIT")
-        ?? (provider === "groq" ? 100 : 10));
-
+      const dailyRequests = provider === "groq" ? 900 : 18;
+      const dailyTokens = provider === "groq" ? 180000 : 100000;
       const reserve = () => req.supabase.rpc("reserve_ai_generation", {
         p_provider: provider,
         p_estimated_tokens: estimatedTokens,
-        p_daily_request_limit: dailyRequests,
-        p_daily_token_limit: dailyTokens,
-        p_minute_token_limit: minuteTokens,
-        p_user_daily_request_limit: userDailyRequests,
-        p_minute_request_limit: minuteRequests,
       });
       let reservation = await reserve();
       if (reservation.error) {
