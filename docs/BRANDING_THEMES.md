@@ -201,3 +201,27 @@ Apply migrations in order and confirm Row Level Security policies are enabled fo
 ## 14. Known verification boundary
 
 This guide records the architecture and code surfaces inspected for this update. It does not claim that a production build, browser visual regression, API integration test or full device test has passed unless a corresponding result is recorded separately. Theme coverage should be reviewed component-by-component as the product evolves.
+
+## 15. Public landing page — reference-led design
+
+The public homepage at `apps/web/app/page.tsx` is implemented as real responsive UI, based on the two NeuralPath visual reference boards supplied for the redesign. The references are design inspiration, not production screenshots to embed as a single image.
+
+### Visual mapping
+- **Brand header:** the existing scalable `/icon.svg` mark, NeuralPath wordmark, public navigation and account actions.
+- **Hero:** “Your smart path to a better tomorrow”, gradient primary action, supporting how-it-works link, and a custom SVG neural-network illustration with orbit, glow and platform details.
+- **Feature overview:** personal learning paths, AI learning companion, progress tracking and learning resources.
+- **Workspace preview:** a CSS/React dashboard preview with navigation, search, progress summary, next tasks and AI companion. This is an illustrative preview and is not a live authenticated user dashboard.
+- **Learning areas:** technology & AI, design & creativity, business & finance, and personal growth.
+- **AI section:** explains AI as supportive learning assistance, not a replacement for learner decisions.
+- **Closing CTA:** sign-up entry point.
+
+### Responsive and theme behaviour
+- Mobile-first layouts adapt from 360px to ultrawide displays; preview cards and navigation simplify on narrow screens.
+- Dark theme uses deep navy, cyan, blue and violet accents.
+- Light theme uses cool white surfaces, dark navy typography and the same brand accent system.
+- The shared root theme control persists the selected theme in browser local storage.
+- Framer Motion entrances respect reduced-motion preferences.
+- Lucide React icons and inline SVG artwork are used; no screenshot background, remote image dependency, new package, backend endpoint or database migration is required.
+
+### Verification boundary
+The implementation is committed on `feat/neuralpath-reference-landing-page`. It must still pass the Vercel preview build, lint/typecheck, and visual checks at 360, 390, 430, 768, 1024, 1280, 1440, 1920 and 2560 CSS pixels. The dashboard preview on the homepage is deliberately illustrative; authenticated data continues to be shown on the actual `/dashboard` route.
