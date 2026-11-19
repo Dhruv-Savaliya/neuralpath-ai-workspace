@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Logger } from "@nestjs/common";
 import {
   BadRequestException,
@@ -51,7 +51,7 @@ export class AiService {
     if (!chunks.length) throw new BadRequestException("Knowledge content must contain readable text.");
     const embeddings: number[][] = [];
     for (let offset = 0; offset < chunks.length; offset += 8) {
-      embeddings.push(...(await this.embed(chunks.slice(offset, offset + 8))));
+      embeddings.push(...(await this.embed(req, chunks.slice(offset, offset + 8))));
     }
     if (embeddings.length !== chunks.length) {
       throw new ServiceUnavailableException("Embedding provider returned an incomplete batch.");
@@ -133,7 +133,7 @@ export class AiService {
 
   async chat(req: AuthenticatedRequest, dto: ChatDto) {
     const question = dto.question.trim();
-    const [queryEmbedding] = await this.embed([question]);
+    const [queryEmbedding] = await this.embed(req, [question]);
     await this.recordUsage(req, "cloudflare", this.model, "embedding", question.length, 0);
 
     const { data, error } = await req.supabase.rpc("match_knowledge_chunks", {
@@ -231,7 +231,7 @@ export class AiService {
     return chunks;
   }
 
-  private async embed(texts: string[]): Promise<number[][]> {
+  private async embed(req: AuthenticatedRequest, texts: string[]): Promise<number[][]> {
     const accountId = this.config.get<string>("CLOUDFLARE_ACCOUNT_ID");
     const token = this.config.get<string>("CLOUDFLARE_API_TOKEN");
     const model = this.config.get<string>("CLOUDFLARE_EMBEDDING_MODEL") ?? this.model;
@@ -239,40 +239,107 @@ export class AiService {
     if (!accountId || !token) {
       throw new ServiceUnavailableException("Cloudflare Workers AI credentials are not configured.");
     }
-    if (configuredDimensions !== this.dimensions) {
-      throw new ServiceUnavailableException("The configured embedding dimensions must be 1024 for BGE-M3.");
-    }
-    if (model !== this.model) {
-      throw new ServiceUnavailableException("Only @cf/baai/bge-m3 is enabled for the current vector schema.");
+    if (configuredDimensions !== this.dimensions || model !== this.model) {
+      throw new ServiceUnavailableException("The configured embedding model must remain BGE-M3 with 1024 dimensions for the current vector schema.");
     }
 
-    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${encodeURIComponent(model)}`;
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ text: texts }),
-        signal: AbortSignal.timeout(30000),
-      });
-    } catch {
-      throw new ServiceUnavailableException("Cloudflare embedding service timed out or could not be reached.");
+    // Cache by authenticated user + normalized text + model. Existing vectors
+    // are reused without spending additional Workers AI neurons.
+    const normalized = texts.map(value => value.replace(/\\s+/g, " ").trim());
+    const hashes = normalized.map(value => createHash("sha256").update(value).digest("hex"));
+    const cached = await req.supabase.from("ai_embedding_cache")
+      .select("content_hash,embedding")
+      .eq("user_id", req.user.id)
+      .eq("embedding_model", model)
+      .in("content_hash", hashes);
+    if (cached.error) {
+      this.logger.warn(`Embedding cache lookup failed: ${cached.error.code ?? "database_error"}`);
     }
-
-    const payload = (await response.json().catch(() => ({}))) as EmbeddingResponse;
-    if (!response.ok || payload.success === false) {
-      throw new ServiceUnavailableException(payload.errors?.[0]?.message ?? "Cloudflare embedding request failed.");
-    }
-    const vectors = payload.result?.data;
-    if (!Array.isArray(vectors) || vectors.length !== texts.length) {
-      throw new ServiceUnavailableException("Cloudflare returned an unexpected embedding response.");
-    }
-    for (const vector of vectors) {
-      if (!Array.isArray(vector) || vector.length !== this.dimensions || vector.some(value => !Number.isFinite(value))) {
-        throw new ServiceUnavailableException("BGE-M3 embedding dimensions did not match vector(1024).");
+    const vectorByHash = new Map<string, number[]>();
+    for (const row of cached.data ?? []) {
+      const raw = row.embedding;
+      let vector: number[] | null = null;
+      if (Array.isArray(raw)) vector = raw.map(Number);
+      else if (typeof raw === "string") {
+        try { vector = JSON.parse(raw) as number[]; } catch { vector = null; }
+      }
+      if (vector && vector.length === this.dimensions && vector.every(Number.isFinite)) {
+        vectorByHash.set(row.content_hash, vector);
       }
     }
-    return vectors;
+
+    const missingIndexes = hashes.map((hash, index) => vectorByHash.has(hash) ? -1 : index).filter(index => index >= 0);
+    if (missingIndexes.length) {
+      const missingTexts = missingIndexes.map(index => normalized[index]);
+      // BGE-M3 currently consumes 1,075 neurons per million input tokens.
+      // Reserve conservatively at 3 characters/token and keep 1,000 neurons
+      // of the free daily allocation unused as an emergency buffer.
+      const estimatedTokens = missingTexts.reduce((sum, value) => sum + Math.ceil(value.length / 3), 0);
+      const estimatedNeurons = Math.max(1, Math.ceil(estimatedTokens * 1075 / 1_000_000));
+      const reservation = await req.supabase.rpc("reserve_cloudflare_neurons", {
+        p_estimated_neurons: estimatedNeurons,
+      });
+      if (reservation.error) {
+        this.logger.error(`Cloudflare neuron reservation failed: ${reservation.error.code ?? "database_error"}`);
+        throw new ServiceUnavailableException("The daily AI embedding budget is unavailable. Please try again tomorrow.");
+      }
+      const reserveRow = Array.isArray(reservation.data) ? reservation.data[0] : reservation.data;
+      if (!reserveRow?.allowed) {
+        throw new ServiceUnavailableException({
+          code: "CLOUDFLARE_DAILY_NEURON_BUDGET_REACHED",
+          message: "Today's free AI embedding allowance has been reached. Your saved data is safe; please try again after the daily reset.",
+        });
+      }
+
+      try {
+        const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${encodeURIComponent(model)}`;
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ text: missingTexts }),
+          signal: AbortSignal.timeout(30000),
+        });
+        const payload = (await response.json().catch(() => ({}))) as EmbeddingResponse;
+        if (!response.ok || payload.success === false) {
+          throw new ServiceUnavailableException(payload.errors?.[0]?.message ?? "Cloudflare embedding request failed.");
+        }
+        const vectors = payload.result?.data;
+        if (!Array.isArray(vectors) || vectors.length !== missingTexts.length) {
+          throw new ServiceUnavailableException("Cloudflare returned an unexpected embedding response.");
+        }
+        vectors.forEach((vector, index) => {
+          if (!Array.isArray(vector) || vector.length !== this.dimensions || vector.some(value => !Number.isFinite(value))) {
+            throw new ServiceUnavailableException("BGE-M3 embedding dimensions did not match vector(1024).");
+          }
+          vectorByHash.set(hashes[missingIndexes[index]], vector);
+        });
+
+        const cacheRows = missingIndexes.map((index, offset) => ({
+          user_id: req.user.id,
+          embedding_model: model,
+          content_hash: hashes[index],
+          embedding: vectors[offset],
+        }));
+        const savedCache = await req.supabase.from("ai_embedding_cache")
+          .upsert(cacheRows, { onConflict: "user_id,embedding_model,content_hash", ignoreDuplicates: true });
+        if (savedCache.error) {
+          this.logger.warn(`Embedding cache write failed: ${savedCache.error.code ?? "database_error"}`);
+        }
+        await this.recordUsage(req, "cloudflare", model, "embedding",
+          missingTexts.reduce((sum, value) => sum + value.length, 0), 0);
+      } catch (error) {
+        await req.supabase.rpc("release_cloudflare_neurons", {
+          p_reservation_id: reserveRow.reservation_id,
+        }).catch(() => undefined);
+        throw error;
+      }
+    }
+
+    return hashes.map(hash => {
+      const vector = vectorByHash.get(hash);
+      if (!vector) throw new ServiceUnavailableException("An embedding vector was not available after generation.");
+      return vector;
+    });
   }
 
   private async generate(
