@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { signOut } from "../actions/auth";
 import {
   Activity, ArrowRight, ArrowUpRight, Award, BookOpen, BrainCircuit, CalendarDays,
@@ -87,6 +87,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const refresh = useCallback(async () => {
     const next = await neuralPathApi.getDashboard();
@@ -180,7 +181,7 @@ export default function Home() {
   );
 
   return (
-    <motion.main className="np-shell" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35, ease: "easeOut" }}>
+    <motion.main className="np-shell" initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.35, ease: "easeOut" }}>
       {mobileNavOpen ? <button className="np-scrim" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)}/> : null}
       <aside className={`np-sidebar ${mobileNavOpen ? "np-sidebar-open" : ""}`}>
         <div className="np-brand">
