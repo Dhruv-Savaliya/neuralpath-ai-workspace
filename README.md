@@ -2,6 +2,10 @@
 
 NeuralPath is a personalized learning workspace. The web app and API are separate deployable applications in one repository.
 
+## Project documentation
+
+- [Branding, themes and developer guide](docs/BRANDING_THEMES.md) — brand identity, dark/light mode behaviour, architecture, local setup, environment configuration, deployment, security and quality checks.
+
 ## Architecture
 - `apps/web` — Next.js 15, React 19, TypeScript, Tailwind CSS v4.
 - `apps/api` — NestJS 11 REST API.
