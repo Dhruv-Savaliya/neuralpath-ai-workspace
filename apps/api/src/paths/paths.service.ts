@@ -95,12 +95,17 @@ export class PathsService {
           batch = this.parseCurriculumBatch(generated.answer, startDay, endDay);
         } catch (error) {
           lastError = error;
+          // Provider outages and rate limits are not malformed JSON. Do not immediately
+          // send a second request to the same exhausted quota window.
+          if (error instanceof ServiceUnavailableException) break;
         }
       }
       if (!batch) {
-        throw new ServiceUnavailableException(
-          `Unable to generate a valid curriculum for days ${startDay}-${endDay}. ${lastError instanceof Error ? lastError.message : "Please retry generation."}`,
-        );
+        this.logger.warn(`Curriculum batch ${startDay}-${endDay} stopped: ${lastError instanceof Error ? lastError.name : "unknown error"}`);
+        throw new ServiceUnavailableException({
+          code: "CURRICULUM_GENERATION_TEMPORARILY_UNAVAILABLE",
+          message: "Your learning plan could not be generated right now because the AI service is busy. Your profile and goals are saved. Please try again shortly.",
+        });
       }
       days.push(...batch);
     }
