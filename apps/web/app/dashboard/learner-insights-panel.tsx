@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertCircle, CalendarClock, CheckCircle2, Flame, LoaderCircle, RefreshCw, Target } from "lucide-react";
+import { Activity, AlertCircle, CalendarClock, CheckCircle2, Flame, RefreshCw, Target } from "lucide-react";
 import { neuralPathApi, type LearnerInsights, type LearningRecommendations } from "../../lib/api/client";
 
 export default function LearnerInsightsPanel() {
