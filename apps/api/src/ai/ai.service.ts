@@ -330,9 +330,13 @@ export class AiService {
         });
         if (finalized.error) this.logger.warn(`Cloudflare neuron reservation finalization failed: ${finalized.error.code ?? "database_error"}`);
       } catch (error) {
-        await req.supabase.rpc("release_cloudflare_neurons", {
-          p_reservation_id: reserveRow.reservation_id,
-        }).catch(() => undefined);
+        try {
+          await req.supabase.rpc("release_cloudflare_neurons", {
+            p_reservation_id: reserveRow.reservation_id,
+          });
+        } catch {
+          this.logger.warn("Cloudflare neuron reservation release failed.");
+        }
         throw error;
       }
     }
