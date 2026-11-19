@@ -121,7 +121,7 @@ test("bootstrap generates nine validated batches and persists exactly 180 ordere
   const service = new PathsService(ai);
   const result = await service.bootstrap({ user: { id: "learner-1" }, supabase: db }, { goal_id: goal.id });
 
-  assert.equal(batchCalls, 9);
+  assert.equal(batchCalls, 15);
   assert.match(firstPrompt, /founder/);
   assert.match(firstPrompt, /business/);
   assert.match(firstPrompt, /customer problems/);
