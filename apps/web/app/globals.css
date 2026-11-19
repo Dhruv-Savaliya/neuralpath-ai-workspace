@@ -213,3 +213,21 @@ body{background:var(--site-bg)}
 }
 @media(max-width:380px){.np-welcome h1{font-size:23px}.np-today-chip{min-width:76px}.np-kpi{gap:6px}.np-kpi b{font-size:14px}.np-hero-copy{max-width:90%}.np-top-actions{gap:5px}}
 @media(prefers-reduced-motion:reduce){.np-shell *{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+
+/* Database-backed achievements */
+.np-achievements{display:grid;gap:13px}
+.np-reward-hero{display:grid;grid-template-columns:76px minmax(0,1fr) auto;align-items:center;gap:18px;padding:22px;border:1px solid #8177b34a;border-radius:13px;background:linear-gradient(110deg,#25213f,#192c3b);margin-bottom:13px}
+.np-level-orb{width:72px;height:72px;border-radius:50%;border:2px solid #a99aff;box-shadow:0 0 25px #8275e344,inset 0 0 18px #8275e322;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.np-level-orb small{font-size:7px;letter-spacing:1px;color:#b9b1ee}.np-level-orb b{font-size:25px}
+.np-reward-hero>div:nth-child(2)>small{font-size:8px;color:#a99aff;letter-spacing:1.2px}.np-reward-hero h2{font-size:19px;margin:5px 0}.np-reward-hero p{font-size:9px;color:#9ca8bd;margin:0}
+.np-reward-hero>div:nth-child(2) .np-progress-track{max-width:360px}.np-reward-hero>div:nth-child(2)>small:last-child{font-size:8px;color:#8996ab}
+.np-reward-total{display:flex;flex-direction:column;align-items:center;gap:4px;color:#e7ca79}.np-reward-total b{font-size:21px}.np-reward-total small{font-size:8px;letter-spacing:1px;color:#a99a6b}
+.np-badge-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.np-badge{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid #ffffff0c;border-radius:9px;background:#171f2d;opacity:.62;min-width:0}
+.np-badge.earned{opacity:1;border-color:#8177b34a;background:#211f36}
+.np-badge>span{width:37px;height:37px;display:grid;place-items:center;border-radius:50%;background:#293242;color:#7f8da5;flex:none}
+.np-badge.earned>span{background:#3a3159;color:#c2b5ff}
+.np-badge>div{min-width:0;flex:1}.np-badge b,.np-badge small{display:block}.np-badge b{font-size:10px}.np-badge small{font-size:8px;color:#8994a9;margin-top:4px;line-height:1.5}
+.np-badge strong{font-size:8px;color:#8290a6;white-space:nowrap}.np-badge.earned strong{color:#8cdbb5}
+@media(max-width:760px){.np-reward-hero{grid-template-columns:58px minmax(0,1fr);gap:12px;padding:15px}.np-level-orb{width:56px;height:56px}.np-level-orb b{font-size:20px}.np-reward-hero h2{font-size:15px}.np-reward-total{grid-column:1/-1;flex-direction:row;justify-content:flex-start;padding-top:9px;border-top:1px solid #ffffff12}.np-reward-total b{font-size:15px}.np-badge-grid{grid-template-columns:1fr}.np-badge{padding:10px}}
