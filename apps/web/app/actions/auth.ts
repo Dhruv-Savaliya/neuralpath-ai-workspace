@@ -82,11 +82,13 @@ export async function saveOnboarding(formData: FormData) {
   const interests = formData.getAll("interests").map(String).map(v => v.trim().slice(0,40)).filter(Boolean).slice(0,20);
   const formats = formData.getAll("learning_formats").map(String).filter(v => formatsAllowed.includes(v)).slice(0,10);
   const rawGoals = formData.getAll("goal_title").map(String);
+  const goalId = String(formData.get("goal_id") ?? "").trim();
   const categories = formData.getAll("goal_category").map(String);
   const outcomes = formData.getAll("desired_outcome").map(String);
   const goalLevels = formData.getAll("goal_level").map(String);
   const dates = formData.getAll("target_date").map(String);
   const goals = rawGoals.map((title,i)=>({
+    ...(i === 0 && /^[0-9a-f-]{36}$/i.test(goalId) ? { id: goalId } : {}),
     title:title.trim().slice(0,120),
     category:(categories[i] ?? "general").trim().slice(0,60),
     desired_outcome:(outcomes[i] ?? "").trim().slice(0,1000),
