@@ -78,7 +78,7 @@ export default function WorkspaceGoalsPanel() {
             {goal.paths?.map(path=><p key={path.id} style={{fontSize:12,color:"var(--muted,#9ca3af)",margin:"8px 0 0"}}>{path.title} · {path.items?.filter(item=>item.progress==="completed").length??0}/{path.items?.length??0} tasks complete</p>)}
           </>}
         </article>)}
-      </div>:<div className="np-empty-state compact" style={{border:"1px dashed var(--border,rgba(148,163,184,.2))",borderRadius:12,marginBottom:18}}><Target size={22}/><b>Your next chapter starts with one goal</b><span>You haven't saved a learning goal yet. Add one below and NeuralPath can shape a practical path around it.</span></div>}
+      </div>:<div className="np-empty-state compact" style={{border:"1px dashed var(--border,rgba(148,163,184,.2))",borderRadius:12,marginBottom:18}}><Target size={22}/><b>Your next chapter starts with one goal</b><span>You haven&apos;t saved a learning goal yet. Add one below and NeuralPath can shape a practical path around it.</span></div>}
     </>:null}
     <form className="workspace-goals-form" onSubmit={submitGoal}>
       <label style={{display:"grid",gap:6,fontSize:13}}>Goal title<input value={title} onChange={e=>setTitle(e.target.value)} maxLength={120} minLength={3} required placeholder="e.g. Learn full-stack development"/></label>
