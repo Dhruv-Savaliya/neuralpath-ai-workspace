@@ -20,16 +20,16 @@ const PHASE_LENGTH_DAYS = 7;
 
 function topicForDay(items: Array<{ title: string; description: string }>, day: number): string {
   const item = items.find(candidate => {
-    const titleDay = Number(candidate.title.match(/^Day\\s+(\\d+)/i)?.[1]);
+    const titleDay = Number(candidate.title.match(/^Day\s+(\d+)/i)?.[1]);
     return titleDay === day;
   });
   if (!item) return "";
   const description = item.description.trim();
-  const separator = description.search(/\\s[—–-]\\s/);
+  const separator = description.search(/\s[—–-]\s/);
   const fromDescription = separator > 0 ? description.slice(0, separator).trim() : "";
   const fromTitle = item.title
-    .replace(/^Day\\s+\\d+\\s*:\\s*/i, "")
-    .replace(/^(lesson|exercise|resource|project)\\s*[—–:-]\\s*/i, "")
+    .replace(/^Day\s+\d+\s*:\s*/i, "")
+    .replace(/^(lesson|exercise|resource|project)\s*[—–:-]\s*/i, "")
     .trim();
   return (fromDescription || fromTitle).slice(0, 64);
 }
