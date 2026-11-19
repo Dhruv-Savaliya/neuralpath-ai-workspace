@@ -211,7 +211,7 @@ export default function Home() {
         ) : <p className="np-sidebar-empty">Your personalized path will appear here after you create one.</p>}
         <div className="np-sidebar-bottom">
           <div className="np-streak-card"><div><Flame size={17}/></div><span><b>{stats?.currentStreak ?? 0} day streak</b><small>Consistency compounds</small></span><Sparkles size={16}/></div>
-          <div className="np-user-row"><div className="np-avatar">{friendlyName(dashboard?.profile).slice(0, 1).toUpperCase()}</div><div><b>{friendlyName(dashboard?.profile)}</b><small>{dashboard?.profile?.profession?.replaceAll("_", " ") || "Learner"}</small></div></div>
+          <div className="np-user-row"><div className="np-avatar">{friendlyName(dashboard?.profile ?? null).slice(0, 1).toUpperCase()}</div><div><b>{friendlyName(dashboard?.profile ?? null)}</b><small>{dashboard?.profile?.profession?.replaceAll("_", " ") || "Learner"}</small></div></div>
           <form action={signOut}><button className="np-signout"><LogOut size={15}/> Sign out</button></form>
         </div>
       </aside>
@@ -226,7 +226,7 @@ export default function Home() {
             <span className="np-date"><CalendarDays size={14}/>{formatDate()}</span>
             <span className="np-xp"><Zap size={14}/>{(stats?.xp ?? 0).toLocaleString()} <small>XP</small></span>
             <button className="np-refresh" onClick={() => void handleRefresh()} disabled={refreshing} aria-label="Refresh dashboard"><RefreshCw size={16} className={refreshing ? "np-spin" : ""}/></button>
-            <button className="np-top-avatar" onClick={() => changeTab("profile")} aria-label="Open profile">{friendlyName(dashboard?.profile).slice(0, 1).toUpperCase()}</button>
+            <button className="np-top-avatar" onClick={() => changeTab("profile")} aria-label="Open profile">{friendlyName(dashboard?.profile ?? null).slice(0, 1).toUpperCase()}</button>
           </div>
         </header>
 
@@ -238,7 +238,7 @@ export default function Home() {
             <>
               <div className="np-welcome">
                 <div><div className="np-eyebrow"><span/> YOUR PERSONAL LEARNING SPACE</div>
-                  <h1>Welcome back, <em>{friendlyName(dashboard?.profile).split(" ")[0]}.</em></h1>
+                  <h1>Welcome back, <em>{friendlyName(dashboard?.profile ?? null).split(" ")[0]}.</em></h1>
                   <p>Your goals, progress and next steps — all in one place. Make today count.</p>
                 </div>
                 <div className="np-today-chip"><small>TODAY</small><b>{formatDate().split(",")[0]}</b><span>{formatDate().split(",").slice(1).join(",").trim()}</span></div>
