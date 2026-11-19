@@ -504,6 +504,11 @@ export class AiService {
             signal: AbortSignal.timeout(60000),
           },
         );
+        if (attempt === 0 && [408, 500, 502, 503, 504].includes(response.status)) {
+          await new Promise(resolve => setTimeout(resolve, 1200));
+          response = undefined;
+          continue;
+        }
         break;
       } catch (error) {
         lastNetworkError = error;
