@@ -158,9 +158,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   const raw = response.status === 204 ? "" : await response.text();
-  let payload: { message?: string; error?: string; detail?: string } | null = null;
+  type ApiErrorPayload = { message?: string; error?: string; detail?: string };
+  let payload: ApiErrorPayload | null = null;
   if (raw) {
-    try { payload = JSON.parse(raw) as typeof payload; } catch { payload = null; }
+    try { payload = JSON.parse(raw) as ApiErrorPayload; } catch { payload = null; }
   }
   if (!response.ok) {
     const serverMessage = payload?.message ?? payload?.detail ?? payload?.error;
