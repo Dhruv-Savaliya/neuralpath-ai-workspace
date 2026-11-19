@@ -355,8 +355,8 @@ export class AiService {
     const geminiKey = this.config.get<string>("GEMINI_API_KEY");
     const geminiModel = this.config.get<string>("GEMINI_MODEL") ?? "gemini-3.8-flash";
     const maxOutputTokens = Math.max(512, Math.min(
-      4096,
-      Number(this.config.get<string>("AI_MAX_OUTPUT_TOKENS") ?? 4096),
+      3000,
+      Number(this.config.get<string>("AI_MAX_OUTPUT_TOKENS") ?? 2000),
     ));
     const estimatedInputTokens = Math.ceil(prompt.length / 3);
     const estimatedTokens = estimatedInputTokens + maxOutputTokens;
@@ -377,7 +377,7 @@ export class AiService {
       const userDailyRequests = Number(this.config.get<string>(provider === "groq" ? "GROQ_USER_DAILY_REQUEST_LIMIT" : "GEMINI_USER_DAILY_REQUEST_LIMIT")
         ?? (provider === "groq" ? 100 : 10));
 
-      const reservation = await req.supabase.rpc("reserve_ai_generation", {
+      const reserve = () => req.supabase.rpc("reserve_ai_generation", {
         p_provider: provider,
         p_estimated_tokens: estimatedTokens,
         p_daily_request_limit: dailyRequests,
@@ -386,13 +386,29 @@ export class AiService {
         p_user_daily_request_limit: userDailyRequests,
         p_minute_request_limit: minuteRequests,
       });
+      let reservation = await reserve();
       if (reservation.error) {
         this.logger.error(`${provider} quota reservation failed: ${reservation.error.code ?? "database_error"}`);
         throw new ProviderError(`${provider} quota guard is unavailable.`, 503);
       }
-      const row = Array.isArray(reservation.data) ? reservation.data[0] : reservation.data;
+      let row = Array.isArray(reservation.data) ? reservation.data[0] : reservation.data;
+      if (!row?.allowed) {
+        const dailyLimitReached = Number(row?.used_daily_requests ?? 0) >= dailyRequests
+          || Number(row?.used_daily_tokens ?? 0) + estimatedTokens > dailyTokens;
+        if (!dailyLimitReached) {
+          // A minute window is full, not the daily allowance. Wait for the
+          // next UTC minute and make one bounded reservation attempt.
+          const waitMs = 60000 - (Date.now() % 60000) + 300;
+          await new Promise(resolve => setTimeout(resolve, waitMs));
+          reservation = await reserve();
+          if (reservation.error) {
+            throw new ProviderError(`${provider} quota guard is unavailable.`, 503);
+          }
+          row = Array.isArray(reservation.data) ? reservation.data[0] : reservation.data;
+        }
+      }
       if (!row?.allowed || !row.reservation_id) {
-        throw new ProviderError(`${provider} application safety budget reached.`, 429);
+        throw new ProviderError(`${provider} application daily or per-user safety budget reached.`, 429);
       }
       try {
         const answer = await run();
@@ -402,11 +418,12 @@ export class AiService {
         if (finalized.error) this.logger.warn(`${provider} quota reservation finalization failed: ${finalized.error.code ?? "database_error"}`);
         return answer;
       } catch (error) {
-        await req.supabase.rpc("release_ai_generation", { p_reservation_id: row.reservation_id })
-          .then(({ error: releaseError }) => {
-            if (releaseError) this.logger.warn(`${provider} quota reservation release failed: ${releaseError.code ?? "database_error"}`);
-          })
-          .catch(() => this.logger.warn(`${provider} quota reservation release failed.`));
+        // Keep the reservation charged: a provider may have consumed tokens
+        // even when its response failed validation or the connection dropped.
+        const finalized = await req.supabase.rpc("complete_ai_generation", {
+          p_reservation_id: row.reservation_id,
+        });
+        if (finalized.error) this.logger.warn(`${provider} failed-request reservation finalization failed: ${finalized.error.code ?? "database_error"}`);
         throw error;
       }
     };
