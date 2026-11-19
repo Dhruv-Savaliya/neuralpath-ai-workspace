@@ -189,7 +189,7 @@ export default function Home() {
     <main className="np-loading np-failure-screen">
       <div className="np-failure-icon"><Activity size={26}/></div>
       <span className="np-eyebrow"><span/> WORKSPACE CONNECTION</span>
-      <h1>We couldn't load your workspace.</h1>
+      <h1>We couldn&apos;t load your workspace.</h1>
       <p>{error || "Your learning data is safe. Check your connection and try again."}</p>
       <button className="np-primary" onClick={() => { setLoading(true); setError(""); void refresh().catch(cause => setError(cause instanceof Error ? cause.message : "Unable to load your workspace.")).finally(() => setLoading(false)); }}>
         <RefreshCw size={15}/> Try again
