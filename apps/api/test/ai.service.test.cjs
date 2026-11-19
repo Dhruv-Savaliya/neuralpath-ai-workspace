@@ -78,7 +78,6 @@ test("Groq is primary and Gemini is not called after a successful Groq response"
     assert.equal(calls.length, 1);
     assert.ok(calls[0].includes("api.groq.com"));
     assert.ok(req.rpcCalls.some(call => call.name === "reserve_ai_generation" && call.args.p_provider === "groq"));
-    assert.ok(req.rpcCalls.some(call => call.name === "release_ai_generation" && call.args.p_reservation_id === "reservation-test"));
     assert.ok(req.rpcCalls.some(call => call.name === "complete_ai_generation"));
   } finally {
     global.fetch = originalFetch;
@@ -113,6 +112,7 @@ test("Gemini is used when primary Groq is rate limited", async () => {
     assert.equal(calls.length, 2);
     assert.ok(calls[0].includes("api.groq.com"));
     assert.ok(calls[1].includes("generativelanguage.googleapis.com"));
+    assert.ok(req.rpcCalls.some(call => call.name === "release_ai_generation" && call.args.p_reservation_id === "reservation-test"));
     assert.ok(req.rpcCalls.some(call => call.name === "complete_ai_generation"));
   } finally {
     global.fetch = originalFetch;
