@@ -81,7 +81,6 @@ export default function WorkspaceGoalsPanel() {
       <button className="primary-btn workspace-goals-submit" type="submit" disabled={saving||loading}>{saving?<LoaderCircle size={15}/>:<Plus size={15}/>} Save goal</button>
     </form>
     {notice?<p role="status" style={{color:"#34d399",margin:"12px 0 0",fontSize:13}}>{notice}</p>:null}
-    {error&&loading===false?<p role="alert" style={{color:"#f59e0b",margin:"10px 0 0"}}>{error}</p>:null}
     <p style={{color:"var(--muted,#9ca3af)",fontSize:12,margin:"12px 0 0"}}>Saved through your signed-in session and the NeuralPath API. <a href="/onboarding" style={{textDecoration:"underline"}}>Edit your learning profile <ArrowUpRight size={11} style={{display:"inline"}}/></a></p>
   </section>;
 }
