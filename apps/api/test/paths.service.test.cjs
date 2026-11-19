@@ -114,7 +114,7 @@ test("bootstrap generates nine validated batches and persists exactly 180 ordere
       assert.equal(options.jsonMode, true);
       assert.equal(options.preferFallback, false);
       batchCalls += 1;
-      const start = (batchCalls - 1) * 5 + 1;
+      const start = (batchCalls - 1) * 3 + 1;
       return { answer: JSON.stringify(batch(start, 5)), provider: "gemini", model: "test-model" };
     },
   };
