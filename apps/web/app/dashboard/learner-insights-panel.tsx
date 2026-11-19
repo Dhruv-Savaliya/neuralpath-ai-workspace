@@ -80,8 +80,8 @@ export default function LearnerInsightsPanel() {
         </button>
       </div>
 
-      {loading ? <p role="status"><LoaderCircle size={15}/> Calculating your learning insights…</p> : null}
-      {error ? <p role="alert" style={{ color: "#f59e0b" }}><AlertCircle size={15}/> {error}</p> : null}
+      {loading ? <div className="np-insights-skeleton" role="status" aria-label="Calculating learning insights"><div>{[1,2,3,4].map(n=><div className="np-skeleton-card" key={n}><span className="np-skeleton np-skeleton-line short"/><span className="np-skeleton np-skeleton-line title"/><span className="np-skeleton np-skeleton-line"/></div>)}</div><span className="np-skeleton np-skeleton-block"/></div> : null}
+      {error ? <div className="np-inline-error" role="alert"><span><AlertCircle size={15}/> {error}</span><button className="text-btn" type="button" onClick={()=>void load()} disabled={loading}>Try again</button></div> : null}
 
       {!loading && !error && insights ? (
         <>
