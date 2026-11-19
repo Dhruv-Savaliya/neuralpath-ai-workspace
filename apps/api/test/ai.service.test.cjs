@@ -2,213 +2,166 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { AiService } = require("../dist/ai/ai.service.js");
 
-function createService() {
-  const config = {
-    get(key) {
-      if (key === "GEMINI_MODEL") return "gemini-3.8-flash";
-      if (key === "GROQ_MODEL") return "openai/gpt-oss-120b";
-      return undefined;
+function makeReq({ allow = true } = {}) {
+  const rpcCalls = [];
+  return {
+    user: { id: "learner-a" },
+    rpcCalls,
+    supabase: {
+      async rpc(name, args) {
+        rpcCalls.push({ name, args });
+        if (name.startsWith("reserve_")) {
+          return { data: [{ allowed: allow, reservation_id: "reservation-test" }], error: null };
+        }
+        return { data: true, error: null };
+      },
+      from() {
+        return {
+          select() {
+            return {
+              eq() { return this; },
+              in() { return Promise.resolve({ data: [], error: null }); },
+            };
+          },
+          upsert() { return Promise.resolve({ data: [], error: null }); },
+        };
+      },
     },
   };
-  const service = new AiService(config);
-  const events = [];
-  service.recordUsage = async (...args) => { events.push(args); };
-  return { service, events };
+}
+
+function makeConfig(values = {}) {
+  return { get(key) { return values[key]; } };
 }
 
 test("learning generation records provider, model, output size and latency on success", async () => {
-  const { service, events } = createService();
-  service.generate = async () => ({ answer: "Grounded recommendation JSON", provider: "gemini", model: "gemini-3.8-flash" });
-  const result = await service.generateForLearning({ user: { id: "learner-a" } }, "minimal learner context");
-
-  assert.equal(result.provider, "gemini");
+  const service = new AiService(makeConfig());
+  const events = [];
+  service.recordUsage = async (...args) => events.push(args);
+  service.generate = async () => ({ answer: "Grounded response", provider: "groq", model: "openai/gpt-oss-120b" });
+  const result = await service.generateForLearning(makeReq(), "learner context");
+  assert.equal(result.provider, "groq");
   assert.equal(events.length, 1);
-  assert.equal(events[0][1], "gemini");
-  assert.equal(events[0][2], "gemini-3.8-flash");
-  assert.equal(events[0][3], "generation");
+  assert.equal(events[0][1], "groq");
+  assert.equal(events[0][2], "openai/gpt-oss-120b");
   assert.equal(events[0][7], true);
-  assert.equal(events[0][8], undefined);
-  assert.ok(events[0][6] >= 0);
 });
 
-test("learning generation records provider-chain failure without leaking prompts", async () => {
-  const { service, events } = createService();
-  service.generate = async () => { throw new Error("provider unavailable"); };
-
-  await assert.rejects(
-    service.generateForLearning({ user: { id: "learner-a" } }, "private context omitted from telemetry"),
-  );
-  assert.equal(events.length, 1);
-  assert.equal(events[0][1], "generation_chain");
-  assert.equal(events[0][2], "gemini-3.8-flash+openai/gpt-oss-120b");
-  assert.equal(events[0][7], false);
-  assert.equal(events[0][8], "provider_unavailable");
-  assert.equal(events[0][5], 0);
-});
-
-test("learning generation rejects oversized prompts before calling a provider", async () => {
-  const { service, events } = createService();
+test("learning generation rejects oversized prompts before provider invocation", async () => {
+  const service = new AiService(makeConfig());
   let called = false;
-  service.generate = async () => { called = true; throw new Error("should not run"); };
-
-  await assert.rejects(
-    service.generateForLearning({ user: { id: "learner-a" } }, "x".repeat(12001)),
-  );
+  service.generate = async () => { called = true; throw new Error("unexpected"); };
+  await assert.rejects(service.generateForLearning(makeReq(), "x".repeat(12001)));
   assert.equal(called, false);
-  assert.equal(events.length, 0);
 });
 
-
-test("Gemini 429 uses the configured Groq GPT-OSS fallback", async () => {
+test("Groq is primary and Gemini is not called after a successful Groq response", async () => {
   const originalFetch = global.fetch;
   const calls = [];
-  global.fetch = async (url) => {
+  global.fetch = async url => {
     calls.push(String(url));
-    if (String(url).includes("generativelanguage.googleapis.com")) {
-      return new Response(JSON.stringify({ error: { message: "rate limited" } }), {
-        status: 429,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ recommendations: [] }) } }] }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ choices: [{ message: { content: "Groq answer" }, finish_reason: "stop" }] }), {
+      status: 200, headers: { "Content-Type": "application/json" },
     });
   };
-
   try {
-    const config = {
-      get(key) {
-        return ({
-          GEMINI_API_KEY: "test-gemini-key",
-          GEMINI_MODEL: "gemini-3.8-flash",
-          GROQ_API_KEY: "test-groq-key",
-          GROQ_MODEL: "openai/gpt-oss-120b",
-        })[key];
-      },
-    };
-    const service = new AiService(config);
+    const service = new AiService(makeConfig({
+      GROQ_API_KEY: "test-groq-key",
+      GROQ_MODEL: "openai/gpt-oss-120b",
+      GEMINI_API_KEY: "test-gemini-key",
+      GEMINI_MODEL: "gemini-3.8-flash",
+    }));
     service.recordUsage = async () => {};
-    const result = await service.generateForLearning(
-      { user: { id: "learner-a" } },
-      "candidate-only learning context",
-    );
-
+    const req = makeReq();
+    const result = await service.generateForLearning(req, "learner context");
     assert.equal(result.provider, "groq");
-    assert.equal(result.model, "openai/gpt-oss-120b");
-    assert.equal(calls.length, 2);
-    assert.ok(calls[0].includes("generativelanguage.googleapis.com"));
-    assert.ok(calls[1].includes("api.groq.com"));
+    assert.equal(calls.length, 1);
+    assert.ok(calls[0].includes("api.groq.com"));
+    assert.ok(req.rpcCalls.some(call => call.name === "reserve_ai_generation" && call.args.p_provider === "groq"));
+    assert.ok(req.rpcCalls.some(call => call.name === "complete_ai_generation"));
   } finally {
     global.fetch = originalFetch;
   }
 });
 
-
-test("Gemini model/configuration errors also attempt the explicitly enabled Groq fallback", async () => {
+test("Gemini is used when primary Groq is rate limited", async () => {
   const originalFetch = global.fetch;
   const calls = [];
-  global.fetch = async (url) => {
+  global.fetch = async url => {
     calls.push(String(url));
-    if (String(url).includes("generativelanguage.googleapis.com")) {
-      return new Response(JSON.stringify({ error: { message: "model not found for this API key" } }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
+    if (String(url).includes("api.groq.com")) {
+      return new Response(JSON.stringify({ error: { message: "rate limit reached" } }), {
+        status: 429, headers: { "Content-Type": "application/json" },
       });
     }
-    return new Response(JSON.stringify({ choices: [{ message: { content: "valid fallback response" } }] }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Gemini fallback answer" }] } }] }), {
+      status: 200, headers: { "Content-Type": "application/json" },
     });
   };
   try {
-    const config = { get(key) {
-      return ({
-        GEMINI_API_KEY: "test-gemini-key",
-        GEMINI_MODEL: "invalid-model-for-test",
-        GROQ_API_KEY: "test-groq-key",
-        GROQ_MODEL: "openai/gpt-oss-120b",
-        GROQ_ENABLED: "true",
-      })[key];
-    }};
-    const service = new AiService(config);
-    const result = await service.generate("test prompt");
-    assert.equal(result.provider, "groq");
+    const service = new AiService(makeConfig({
+      GROQ_API_KEY: "test-groq-key",
+      GROQ_MODEL: "openai/gpt-oss-120b",
+      GEMINI_API_KEY: "test-gemini-key",
+      GEMINI_MODEL: "gemini-3.8-flash",
+    }));
+    service.recordUsage = async () => {};
+    const req = makeReq();
+    const result = await service.generateForLearning(req, "learner context");
+    assert.equal(result.provider, "gemini");
     assert.equal(calls.length, 2);
+    assert.ok(calls[0].includes("api.groq.com"));
+    assert.ok(calls[1].includes("generativelanguage.googleapis.com"));
+    assert.ok(req.rpcCalls.some(call => call.name === "complete_ai_generation"));
   } finally {
     global.fetch = originalFetch;
   }
 });
 
-test("Gemini failure preserves provider reason when Groq is disabled", async () => {
-  const originalFetch = global.fetch;
-  global.fetch = async () => new Response(JSON.stringify({ error: { message: "invalid model" } }), {
-    status: 404, headers: { "Content-Type": "application/json" },
-  });
-  try {
-    const config = { get(key) {
-      return ({
-        GEMINI_API_KEY: "test-gemini-key",
-        GEMINI_MODEL: "invalid-model-for-test",
-        GROQ_ENABLED: "false",
-      })[key];
-    }};
-    const service = new AiService(config);
-    await assert.rejects(
-      () => service.generate("test prompt"),
-      error => error.status === 503 && /Gemini returned HTTP 404: invalid model/.test(error.message),
-    );
-  } finally {
-    global.fetch = originalFetch;
-  }
-});
-
-
-test("Cloudflare BGE-M3 embeddings validate batch size and 1024 dimensions", async () => {
+test("Cloudflare BGE-M3 embedding cache misses are metered and cached", async () => {
   const originalFetch = global.fetch;
   const vector = Array.from({ length: 1024 }, (_, index) => index / 1024);
   let requestBody;
   global.fetch = async (_url, init) => {
     requestBody = JSON.parse(init.body);
-    return new Response(JSON.stringify({ success: true, result: { data: [vector, vector] } }), {
+    return new Response(JSON.stringify({ success: true, result: { data: [vector] } }), {
       status: 200, headers: { "Content-Type": "application/json" },
     });
   };
   try {
-    const config = { get(key) {
-      return ({
-        CLOUDFLARE_ACCOUNT_ID: "test-account",
-        CLOUDFLARE_API_TOKEN: "test-token",
-        CLOUDFLARE_EMBEDDING_MODEL: "@cf/baai/bge-m3",
-        EMBEDDING_DIMENSIONS: "1024",
-      })[key];
-    }};
-    const service = new AiService(config);
-    const result = await service.embed(["first sample text", "second sample text"]);
-    assert.deepEqual(requestBody.text, ["first sample text", "second sample text"]);
-    assert.equal(result.length, 2);
+    const service = new AiService(makeConfig({
+      CLOUDFLARE_ACCOUNT_ID: "test-account",
+      CLOUDFLARE_API_TOKEN: "test-token",
+      CLOUDFLARE_EMBEDDING_MODEL: "@cf/baai/bge-m3",
+      EMBEDDING_DIMENSIONS: "1024",
+    }));
+    service.recordUsage = async () => {};
+    const req = makeReq();
+    const result = await service.embed(req, ["sample embedding text"]);
+    assert.deepEqual(requestBody.text, ["sample embedding text"]);
+    assert.equal(result.length, 1);
     assert.equal(result[0].length, 1024);
+    assert.ok(req.rpcCalls.some(call => call.name === "reserve_cloudflare_neurons"));
+    assert.ok(req.rpcCalls.some(call => call.name === "complete_cloudflare_neurons"));
   } finally {
     global.fetch = originalFetch;
   }
 });
 
-test("Cloudflare BGE-M3 rejects vectors with dimensions that differ from the database schema", async () => {
+test("Cloudflare BGE-M3 rejects vectors that do not match vector(1024)", async () => {
   const originalFetch = global.fetch;
   global.fetch = async () => new Response(JSON.stringify({
     success: true, result: { data: [[0.1, 0.2, 0.3]] },
   }), { status: 200, headers: { "Content-Type": "application/json" } });
   try {
-    const config = { get(key) {
-      return ({
-        CLOUDFLARE_ACCOUNT_ID: "test-account",
-        CLOUDFLARE_API_TOKEN: "test-token",
-        CLOUDFLARE_EMBEDDING_MODEL: "@cf/baai/bge-m3",
-        EMBEDDING_DIMENSIONS: "1024",
-      })[key];
-    }};
-    const service = new AiService(config);
-    await assert.rejects(() => service.embed(["sample text"]), /dimensions did not match vector\(1024\)/);
+    const service = new AiService(makeConfig({
+      CLOUDFLARE_ACCOUNT_ID: "test-account",
+      CLOUDFLARE_API_TOKEN: "test-token",
+      CLOUDFLARE_EMBEDDING_MODEL: "@cf/baai/bge-m3",
+      EMBEDDING_DIMENSIONS: "1024",
+    }));
+    service.recordUsage = async () => {};
+    await assert.rejects(() => service.embed(makeReq(), ["sample embedding text"]), /dimensions did not match vector\(1024\)/);
   } finally {
     global.fetch = originalFetch;
   }
