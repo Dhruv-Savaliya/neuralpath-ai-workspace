@@ -306,9 +306,11 @@ export class AiService {
           ? `Groq HTTP ${fallbackError.status}: ${fallbackError.message}`
           : fallbackError instanceof Error ? fallbackError.message : "Groq unavailable";
         this.logger.error(`AI provider chain failed. Primary: ${primaryReason}. Fallback: ${fallbackReason}`);
-        throw new ServiceUnavailableException(
-          `AI generation failed. Gemini: ${primaryReason}. Groq: ${fallbackReason}`,
-        );
+        // Keep provider internals and quota details in server logs only.
+        throw new ServiceUnavailableException({
+          code: "AI_PROVIDERS_TEMPORARILY_UNAVAILABLE",
+          message: "AI generation is temporarily busy. Please wait a minute and try again. Your saved learning goals and profile are unchanged.",
+        });
       }
     };
 
