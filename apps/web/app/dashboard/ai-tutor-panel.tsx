@@ -13,6 +13,7 @@ type ChatMessage = {
 
 export default function AiTutorPanel() {
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
+  const [sourcesLoading, setSourcesLoading] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [question, setQuestion] = useState("");
   const [title, setTitle] = useState("");
@@ -24,10 +25,13 @@ export default function AiTutorPanel() {
   const [notice, setNotice] = useState("");
 
   const loadSources = useCallback(async () => {
+    setSourcesLoading(true);
     try {
       setSources(await neuralPathApi.getKnowledgeSources());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to load your knowledge library.");
+    } finally {
+      setSourcesLoading(false);
     }
   }, []);
 
@@ -78,7 +82,8 @@ export default function AiTutorPanel() {
         result,
       }]);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "NeuralPath could not answer right now.");
+      setQuestion(prompt);
+      setError(cause instanceof Error ? cause.message : "NeuralPath could not answer right now. Your question is ready to retry.");
     } finally {
       setLoading(false);
     }
@@ -171,7 +176,7 @@ export default function AiTutorPanel() {
                 ) : null}
               </article>
             ))}
-            {loading ? <p role="status" style={{ color: "var(--muted,#9ca3af)", fontSize: 13 }}><LoaderCircle size={14}/> NeuralPath is thinking…</p> : null}
+            {loading ? <div className="np-chat-skeleton" role="status" aria-label="NeuralPath is preparing an answer"><span className="np-skeleton np-skeleton-line short"/><span className="np-skeleton np-skeleton-line"/><span className="np-skeleton np-skeleton-line"/></div> : null}
           </div>
           <form onSubmit={ask} style={{ display: "grid", gap: 8 }}>
             <label htmlFor="neuralpath-ai-question" style={{ fontSize: 12, color: "var(--muted,#9ca3af)" }}>Your question</label>
@@ -213,7 +218,7 @@ export default function AiTutorPanel() {
               <b style={{ display: "flex", alignItems: "center", gap: 8 }}><BookOpen size={16}/> Your knowledge library</b>
               <span style={{ fontSize: 11, color: "var(--muted,#9ca3af)" }}>{sources.length} sources</span>
             </div>
-            {sources.length ? <div style={{ display: "grid", gap: 9 }}>
+            {sourcesLoading ? <div className="np-library-skeleton" role="status" aria-label="Loading knowledge library">{[1,2,3].map(n=><span className="np-skeleton np-skeleton-line" key={n}/>)}</div> : sources.length ? <div style={{ display: "grid", gap: 9 }}>
               {sources.map(source => (
                 <article key={source.source_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 8, padding: "9px 0", borderTop: "1px solid var(--border,rgba(148,163,184,.15))" }}>
                   <div style={{ minWidth: 0 }}>
@@ -223,7 +228,7 @@ export default function AiTutorPanel() {
                   <button className="text-btn" type="button" aria-label={`Delete ${source.title}`} onClick={() => void removeSource(source)}><Trash2 size={14}/></button>
                 </article>
               ))}
-            </div> : <p style={{ color: "var(--muted,#9ca3af)", fontSize: 13 }}>No learning material added yet.</p>}
+            </div> : <div className="np-empty-state compact"><BookOpen size={21}/><b>Your library is ready for its first note</b><span>Add study notes or learning material to give your AI tutor context.</span></div>}
           </div>
         </aside>
       </div>
