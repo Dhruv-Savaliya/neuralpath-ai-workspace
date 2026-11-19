@@ -395,7 +395,7 @@ export class AiService {
       if (response.status === 429 && attempt === 0) {
         const providerMessage = payload.error?.message ?? "";
         const retryAfterHeader = Number(response.headers.get("retry-after"));
-        const retryMatch = providerMessage.match(/(?:try again|retry) in\\s+([0-9]+(?:\\.[0-9]+)?)\\s*s/i);
+        const retryMatch = providerMessage.match(/(?:try again|retry) in\s+([0-9]+(?:\.[0-9]+)?)\s*s/i);
         const retryAfterMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0
           ? retryAfterHeader * 1000
           : retryMatch ? Number(retryMatch[1]) * 1000 : 0;
