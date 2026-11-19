@@ -90,18 +90,18 @@ export default function Home() {
       </section>
 
       <section className="np-home-preview-section">
-        <div className="np-preview-copy"><Reveal><span className="np-kicker"><i/> YOUR LEARNING WORKSPACE</span><h2>A clear view<br/>of <em>what's next.</em></h2><p>See your learning paths, goals and next actions together. Keep your focus on the work that matters, without losing sight of the bigger picture.</p><ul><li><Check size={15}/> Follow a structured learning path</li><li><Check size={15}/> Track tasks and personal goals</li><li><Check size={15}/> Get help from your AI companion</li></ul><Link className="np-text-action" href="/auth/sign-up">Explore your workspace <ArrowRight size={16}/></Link></Reveal></div>
+        <div className="np-preview-copy"><Reveal><span className="np-kicker"><i/> YOUR LEARNING WORKSPACE</span><h2>A clear view<br/>of <em>what&apos;s next.</em></h2><p>See your learning paths, goals and next actions together. Keep your focus on the work that matters, without losing sight of the bigger picture.</p><ul><li><Check size={15}/> Follow a structured learning path</li><li><Check size={15}/> Track tasks and personal goals</li><li><Check size={15}/> Get help from your AI companion</li></ul><Link className="np-text-action" href="/auth/sign-up">Explore your workspace <ArrowRight size={16}/></Link></Reveal></div>
         <Reveal className="np-preview-visual"><DashboardPreview/></Reveal>
       </section>
 
       <section className="np-home-section np-areas-section">
-        <Reveal className="np-section-heading np-centered"><span className="np-kicker"><i/> FOLLOW YOUR CURIOSITY</span><h2>One platform.<br/><em>Many possibilities.</em></h2><p>Start with a subject you love, combine interests or choose a direction you haven't explored yet.</p></Reveal>
+        <Reveal className="np-section-heading np-centered"><span className="np-kicker"><i/> FOLLOW YOUR CURIOSITY</span><h2>One platform.<br/><em>Many possibilities.</em></h2><p>Start with a subject you love, combine interests or choose a direction you haven&apos;t explored yet.</p></Reveal>
         <div className="np-area-grid">{areas.map((item,i)=>{const Icon=item.icon;return <Reveal key={item.title} delay={i*.05}><article className="np-area-card"><span><Icon size={20}/></span><div><h3>{item.title}</h3><p>{item.copy}</p></div><ArrowUpRight size={17}/></article></Reveal>})}</div>
       </section>
 
       <section className="np-home-ai">
         <div className="np-ai-glow"/>
-        <Reveal className="np-ai-copy"><span className="np-kicker"><i/> AI THAT SUPPORTS YOUR PROGRESS</span><h2>Smart support.<br/><em>Your direction.</em></h2><p>Use AI to unpack tricky ideas, brainstorm a project or plan a practical next step. It's here to support your learning — not make your decisions for you.</p><Link className="np-primary-action" href="/features">Discover the AI experience <ArrowUpRight size={16}/></Link></Reveal>
+        <Reveal className="np-ai-copy"><span className="np-kicker"><i/> AI THAT SUPPORTS YOUR PROGRESS</span><h2>Smart support.<br/><em>Your direction.</em></h2><p>Use AI to unpack tricky ideas, brainstorm a project or plan a practical next step. It&apos;s here to support your learning — not make your decisions for you.</p><Link className="np-primary-action" href="/features">Discover the AI experience <ArrowUpRight size={16}/></Link></Reveal>
         <Reveal className="np-ai-feature-stack"><div><span><WandSparkles size={18}/></span><b>Make complex ideas clearer</b><small>Break a topic into understandable pieces.</small></div><div><span><BookOpen size={18}/></span><b>Learn by doing</b><small>Turn concepts into practice and projects.</small></div><div><span><Rocket size={18}/></span><b>Find your next step</b><small>Keep moving with a plan that can evolve.</small></div></Reveal>
       </section>
 
