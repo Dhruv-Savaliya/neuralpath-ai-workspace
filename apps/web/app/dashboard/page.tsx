@@ -199,7 +199,7 @@ export default function Home() {
   );
 
   return (
-    <motion.main className="np-shell" initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.35, ease: "easeOut" }}>
+    <motion.main className="np-shell np-fluid-shell w-full min-w-0 overflow-x-clip" initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.35, ease: "easeOut" }}>
       {mobileNavOpen ? <button className="np-scrim" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)}/> : null}
       <aside className={`np-sidebar ${mobileNavOpen ? "np-sidebar-open" : ""}`}>
         <div className="np-brand">
@@ -236,7 +236,7 @@ export default function Home() {
         </div>
       </aside>
 
-      <section className="np-main">
+      <section className="np-main np-fluid-shell min-w-0">
         <header className="np-topbar">
           <div className="np-top-left">
             <button className="np-mobile-menu" aria-label="Open menu" onClick={() => setMobileNavOpen(true)}><Menu size={20}/></button>
@@ -250,7 +250,7 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="np-content">
+        <div className="np-content np-fluid-content min-w-0">
           {error ? <div className="np-alert error" role="alert">{error}<button onClick={() => setError("")} aria-label="Dismiss"><X size={15}/></button></div> : null}
           {notice ? <div className="np-alert success" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss"><X size={15}/></button></div> : null}
 
