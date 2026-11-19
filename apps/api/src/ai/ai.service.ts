@@ -266,7 +266,14 @@ export class AiService {
       }
     }
 
-    const missingIndexes = hashes.map((hash, index) => vectorByHash.has(hash) ? -1 : index).filter(index => index >= 0);
+    const missingIndexes: number[] = [];
+    const missingHashes = new Set<string>();
+    hashes.forEach((hash, index) => {
+      if (!vectorByHash.has(hash) && !missingHashes.has(hash)) {
+        missingHashes.add(hash);
+        missingIndexes.push(index);
+      }
+    });
     if (missingIndexes.length) {
       const missingTexts = missingIndexes.map(index => normalized[index]);
       // BGE-M3 currently consumes 1,075 neurons per million input tokens.
