@@ -132,25 +132,56 @@ export type AiChatResponse = {
 };
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!baseUrl) throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured.");
+  if (!baseUrl) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
   const supabase = createClient();
   const { data, error } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  if (error || !token) throw new Error("Please sign in again to continue.");
-  const response = await fetch(`${baseUrl}/api/v1${path}`, {
-    ...init,
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...init.headers,
-    },
-  });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null) as { message?: string } | null;
-    throw new Error(payload?.message ?? "The NeuralPath API request failed.");
+  if (error || !token) throw new Error("Your session has expired. Please sign in again.");
+
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/api/v1${path}`, {
+      ...init,
+      cache: "no-store",
+      signal: init.signal ?? AbortSignal.timeout(25_000),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...init.headers,
+      },
+    });
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === "TimeoutError") {
+      throw new Error("This is taking longer than expected. Check your connection and try again.");
+    }
+    throw new Error("We couldn't reach NeuralPath. Check your internet connection and try again.");
   }
-  return response.json() as Promise<T>;
+
+  const raw = response.status === 204 ? "" : await response.text();
+  let payload: { message?: string; error?: string; detail?: string } | null = null;
+  if (raw) {
+    try { payload = JSON.parse(raw) as typeof payload; } catch { payload = null; }
+  }
+  if (!response.ok) {
+    const serverMessage = payload?.message ?? payload?.detail ?? payload?.error;
+    const messages: Record<number, string> = {
+      400: "Some information is missing or invalid. Review your entries and try again.",
+      401: "Your session has expired. Please sign in again.",
+      403: "You don't have permission to access this information.",
+      404: "We couldn't find the requested learning resource. Refresh and try again.",
+      409: "This change conflicts with a newer update. Refresh the page and try again.",
+      422: "Some information couldn't be processed. Check your entries and try again.",
+      429: "You're making requests a little too quickly. Please wait a moment and try again.",
+      500: "NeuralPath hit a temporary server error. Your saved progress is safe — please retry.",
+      502: "The learning service is temporarily unavailable. Please try again shortly.",
+      503: "The learning service is under maintenance. Please try again shortly.",
+      504: "The learning service took too long to respond. Please retry.",
+    };
+    throw new Error(serverMessage || messages[response.status] || `The request couldn't be completed (HTTP ${response.status}). Please try again.`);
+  }
+  if (!raw) return undefined as T;
+  try { return JSON.parse(raw) as T; }
+  catch { throw new Error("NeuralPath returned an unexpected response. Please refresh and try again."); }
 }
 
 export const neuralPathApi = {
