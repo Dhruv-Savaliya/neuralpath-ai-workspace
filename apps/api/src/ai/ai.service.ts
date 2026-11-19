@@ -28,10 +28,10 @@ type GroqResponse = {
   choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
   error?: { message?: string };
 };
-type LearningGenerationOptions = { jsonMode?: boolean; preferFallback?: boolean };
+type LearningGenerationOptions = { jsonMode?: boolean; preferFallback?: boolean; maxOutputTokens?: number };
 
 class ProviderError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(message: string, readonly status: number, readonly reservationUnused = false) {
     super(message);
   }
 }
@@ -365,11 +365,15 @@ export class AiService {
     const groqModel = this.config.get<string>("GROQ_MODEL") ?? "openai/gpt-oss-120b";
     const geminiKey = this.config.get<string>("GEMINI_API_KEY");
     const geminiModel = this.config.get<string>("GEMINI_MODEL") ?? "gemini-3.8-flash";
+    const configuredOutputTokens = Number(this.config.get<string>("AI_MAX_OUTPUT_TOKENS") ?? 3000);
     const maxOutputTokens = Math.max(512, Math.min(
       3000,
-      Number(this.config.get<string>("AI_MAX_OUTPUT_TOKENS") ?? 3000),
+      Number.isFinite(configuredOutputTokens) ? configuredOutputTokens : 3000,
+      options.maxOutputTokens ?? 3000,
     ));
-    const estimatedInputTokens = Math.ceil(prompt.length / 3);
+    // Avoid reserving the full 3,000-token ceiling for compact curriculum
+    // batches; this leaves room for a second normal request under the 7k TPM cap.
+    const estimatedInputTokens = Math.ceil(prompt.length / 4);
     const estimatedTokens = estimatedInputTokens + maxOutputTokens;
 
     const runWithBudget = async (
@@ -379,6 +383,7 @@ export class AiService {
     ) => {
       const dailyRequests = provider === "groq" ? 900 : 18;
       const dailyTokens = provider === "groq" ? 180000 : 100000;
+      const minuteTokens = provider === "groq" ? 7000 : 6000;
       const reserve = () => req.supabase.rpc("reserve_ai_generation", {
         p_provider: provider,
         p_estimated_tokens: estimatedTokens,
@@ -389,23 +394,27 @@ export class AiService {
         throw new ProviderError(`${provider} quota guard is unavailable.`, 503);
       }
       let row = Array.isArray(reservation.data) ? reservation.data[0] : reservation.data;
-      if (!row?.allowed) {
-        const dailyLimitReached = Number(row?.used_daily_requests ?? 0) >= dailyRequests
-          || Number(row?.used_daily_tokens ?? 0) + estimatedTokens > dailyTokens;
-        if (!dailyLimitReached) {
-          // A minute window is full, not the daily allowance. Wait for the
-          // next UTC minute and make one bounded reservation attempt.
-          const waitMs = 60000 - (Date.now() % 60000) + 300;
-          await new Promise(resolve => setTimeout(resolve, waitMs));
-          reservation = await reserve();
-          if (reservation.error) {
-            throw new ProviderError(`${provider} quota guard is unavailable.`, 503);
-          }
-          row = Array.isArray(reservation.data) ? reservation.data[0] : reservation.data;
-        }
+      const dailyLimitReached = (candidate: typeof row) =>
+        Number(candidate?.used_daily_requests ?? 0) >= dailyRequests
+        || Number(candidate?.used_daily_tokens ?? 0) + estimatedTokens > dailyTokens;
+      const minuteLimitReached = (candidate: typeof row) =>
+        Number(candidate?.used_minute_tokens ?? 0) + estimatedTokens > minuteTokens;
+
+      if (!row?.allowed && !dailyLimitReached(row) && minuteLimitReached(row)) {
+        // Only a minute-window denial waits for the next UTC minute.
+        const waitMs = 60000 - (Date.now() % 60000) + 300;
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+        reservation = await reserve();
+        if (reservation.error) throw new ProviderError(`${provider} quota guard is unavailable.`, 503);
+        row = Array.isArray(reservation.data) ? reservation.data[0] : reservation.data;
       }
       if (!row?.allowed || !row.reservation_id) {
-        throw new ProviderError(`${provider} application daily or per-user safety budget reached.`, 429);
+        const reason = dailyLimitReached(row)
+          ? "daily provider safety budget reached"
+          : minuteLimitReached(row)
+            ? "per-minute token budget remains full after waiting"
+            : "per-user request safety budget reached";
+        throw new ProviderError(`${provider} ${reason}.`, 429);
       }
       try {
         const answer = await run();
@@ -415,16 +424,22 @@ export class AiService {
         if (finalized.error) this.logger.warn(`${provider} quota reservation finalization failed: ${finalized.error.code ?? "database_error"}`);
         return answer;
       } catch (error) {
-        // Keep the reservation charged: a provider may have consumed tokens
-        // even when its response failed validation or the connection dropped.
-        const finalized = await req.supabase.rpc("complete_ai_generation", {
-          p_reservation_id: row.reservation_id,
-        });
-        if (finalized.error) this.logger.warn(`${provider} failed-request reservation finalization failed: ${finalized.error.code ?? "database_error"}`);
+        if (error instanceof ProviderError && error.reservationUnused) {
+          // HTTP 429 is a rejected request: refund its unused reservation.
+          const released = await req.supabase.rpc("release_ai_generation", {
+            p_reservation_id: row.reservation_id,
+          });
+          if (released.error) this.logger.warn(`${provider} rejected-request quota release failed: ${released.error.code ?? "database_error"}`);
+        } else {
+          // Network timeouts and 5xx may have consumed tokens; retain the reservation.
+          const finalized = await req.supabase.rpc("complete_ai_generation", {
+            p_reservation_id: row.reservation_id,
+          });
+          if (finalized.error) this.logger.warn(`${provider} failed-request reservation finalization failed: ${finalized.error.code ?? "database_error"}`);
+        }
         throw error;
       }
     };
-
     const groq = groqEnabled && groqKey
       ? { name: "groq" as const, model: groqModel, run: () => runWithBudget("groq", groqModel,
           () => this.generateWithGroq(groqKey, groqModel, prompt, options.jsonMode, maxOutputTokens)) }
@@ -500,7 +515,11 @@ export class AiService {
       throw new ProviderError(`Gemini network request failed after one retry (${reason}).`, 503);
     }
     const payload = (await response.json().catch(() => ({}))) as GeminiResponse;
-    if (!response.ok) throw new ProviderError(payload.error?.message ?? "Gemini request failed.", response.status);
+    if (!response.ok) throw new ProviderError(
+      payload.error?.message ?? "Gemini request failed.",
+      response.status,
+      response.status === 429,
+    );
     const candidate = payload.candidates?.[0];
     if (candidate?.finishReason === "MAX_TOKENS") {
       throw new ProviderError("Gemini output reached its token limit.", 502);
@@ -550,7 +569,11 @@ export class AiService {
           continue;
         }
       }
-      if (!response.ok) throw new ProviderError(payload.error?.message ?? "Groq request failed.", response.status);
+      if (!response.ok) throw new ProviderError(
+        payload.error?.message ?? "Groq request failed.",
+        response.status,
+        response.status === 429,
+      );
       const choice = payload.choices?.[0];
       if (choice?.finish_reason === "length") {
         throw new ProviderError("Groq output reached its token limit.", 502);
