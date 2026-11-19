@@ -11,7 +11,7 @@ async function getAuthRedirectBaseUrl() {
 
   // Trust only this app's Vercel deployment hosts and local development.
   if (
-    normalizedHost === "neuralpath-ai-workspace.vercel.app" ||
+    normalizedHost === "neuralpathx.vercel.app" ||
     normalizedHost.startsWith("neuralpath-ai-workspace-") && normalizedHost.endsWith(".vercel.app")
   ) {
     return `https://${normalizedHost}`;
@@ -21,7 +21,7 @@ async function getAuthRedirectBaseUrl() {
     return `http://${normalizedHost}`;
   }
 
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://neuralpath-ai-workspace.vercel.app").replace(/\/$/, "");
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://neuralpathx.vercel.app").replace(/\/$/, "");
 }
 
 function safeNext(value: FormDataEntryValue | null) {
