@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Compass, Home, Search } from "lucide-react";
+import { ArrowLeft, Compass, Home } from "lucide-react";
 export default function NotFound() {
   return <main className="np-error-page"><div className="np-error-stars" aria-hidden="true"/><div className="np-error-content">
     <div className="np-error-orbit"><span>4</span><i/><b>0</b><i/><span>4</span></div>
