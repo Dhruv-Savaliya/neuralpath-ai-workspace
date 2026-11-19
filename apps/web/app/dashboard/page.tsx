@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { signOut } from "../actions/auth";
 import {
   Activity, ArrowRight, ArrowUpRight, Award, BookOpen, BrainCircuit, CalendarDays,
@@ -179,7 +180,7 @@ export default function Home() {
   );
 
   return (
-    <main className="np-shell">
+    <motion.main className="np-shell" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35, ease: "easeOut" }}>
       {mobileNavOpen ? <button className="np-scrim" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)}/> : null}
       <aside className={`np-sidebar ${mobileNavOpen ? "np-sidebar-open" : ""}`}>
         <div className="np-brand">
@@ -348,7 +349,7 @@ export default function Home() {
           <footer className="np-footer"><span>NEURALPATH <i>·</i> YOUR LEARNING OS</span><span>Built around your goals. Powered by your progress.</span></footer>
         </div>
       </section>
-    </main>
+    </motion.main>
   );
 }
 
