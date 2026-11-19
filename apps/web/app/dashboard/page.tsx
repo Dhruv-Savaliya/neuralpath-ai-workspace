@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { signOut } from "../actions/auth";
 import {
   Activity, ArrowRight, ArrowUpRight, Award, BookOpen, BrainCircuit, CalendarDays,
-  Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clock3,
-  Flame, GraduationCap, LayoutDashboard, LoaderCircle, LogOut, Menu, MessageSquareText,
-  Plus, RefreshCw, Rocket, Settings2, Sparkles, Target, Trophy, UserRound, X, Zap,
+  CheckCircle2, ChevronLeft, ChevronRight, Circle,
+  Flame, GraduationCap, LayoutDashboard, LoaderCircle, LogOut, Menu,
+  Plus, RefreshCw, Rocket, Sparkles, Target, Trophy, UserRound, X, Zap,
 } from "lucide-react";
 import WorkspaceGoalsPanel from "./workspace-goals";
 import WorkspaceProfilePanel from "./workspace-profile";
@@ -21,14 +21,15 @@ import {
   type WorkspaceDashboard,
 } from "../../lib/api/client";
 
-type Tab = "overview" | "roadmap" | "insights" | "goals" | "profile" | "ai";
+type Tab = "overview" | "roadmap" | "insights" | "goals" | "profile" | "achievements" | "ai";
 const navItems: Array<{ id: Tab; label: string; icon: typeof LayoutDashboard }> = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "roadmap", label: "Learning path", icon: BookOpen },
   { id: "insights", label: "Learning insights", icon: Activity },
   { id: "goals", label: "Learning goals", icon: Target },
   { id: "profile", label: "My profile", icon: UserRound },
-  { id: "ai", label: "AI tutor", icon: BrainCircuit },
+  { id: "achievements", label: "Achievements", icon: Trophy },
+  { id: "ai", label: "AI tutor & library", icon: BrainCircuit },
 ];
 
 const phaseTones = ["violet", "blue", "cyan", "pink", "orange", "green", "gold"];
@@ -81,7 +82,6 @@ export default function Home() {
   const [activeDay, setActiveDay] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [savingItem, setSavingItem] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -148,22 +148,6 @@ export default function Home() {
     }
   }
 
-  async function generate(goalId: string) {
-    setGenerating(true);
-    setError("");
-    setNotice("");
-    try {
-      const path = await neuralPathApi.bootstrapPath(goalId);
-      setSelectedPathId(path.id);
-      await refresh();
-      setTab("roadmap");
-      setNotice("Your personalized learning path is saved.");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Learning path generation failed. Your goal remains saved.");
-    } finally {
-      setGenerating(false);
-    }
-  }
 
   async function toggle(item: ApiPathItem) {
     setSavingItem(item.id);
@@ -358,6 +342,7 @@ export default function Home() {
           {tab === "insights" ? <section className="np-page-section"><PageHeading eyebrow="YOUR LEARNING INTELLIGENCE" title="Learning insights" subtitle="Progress, consistency and adaptive recommendations grounded in your saved learning activity."/><LearnerInsightsPanel/></section> : null}
           {tab === "goals" ? <section className="np-page-section"><PageHeading eyebrow="YOUR DIRECTION" title="Learning goals" subtitle="Manage your ambitions and create a roadmap for each goal."/><WorkspaceGoalsPanel/></section> : null}
           {tab === "profile" ? <section className="np-page-section"><PageHeading eyebrow="YOUR LEARNING IDENTITY" title="Personalize your workspace" subtitle="Keep your learner profile current so your roadmap stays relevant."/><WorkspaceProfilePanel/></section> : null}
+          {tab === "achievements" ? <section className="np-page-section"><PageHeading eyebrow="MILESTONES · EXPERIENCE · MOMENTUM" title="Your achievements" subtitle="A record of the progress saved to your account — no sample activity or browser-only XP."/><AchievementsPanel xp={stats?.xp ?? 0} completedTasks={stats?.completedItems ?? 0} completedDays={stats?.completedDays ?? 0} totalPaths={stats?.totalPaths ?? 0}/></section> : null}
           {tab === "ai" ? <section className="np-page-section"><PageHeading eyebrow="YOUR PERSONAL LEARNING ASSISTANT" title="AI tutor" subtitle="Ask questions grounded in your own learning notes and saved material."/><AiTutorPanel/></section> : null}
 
           <footer className="np-footer"><span>NEURALPATH <i>·</i> YOUR LEARNING OS</span><span>Built around your goals. Powered by your progress.</span></footer>
@@ -377,4 +362,22 @@ function Preference({ label, value }: { label: string; value: string }) {
 
 function PageHeading({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle: string }) {
   return <div className="np-page-heading"><div className="np-eyebrow"><span/>{eyebrow}</div><h1>{title}</h1><p>{subtitle}</p></div>;
+}
+
+function AchievementsPanel({ xp, completedTasks, completedDays, totalPaths }: { xp: number; completedTasks: number; completedDays: number; totalPaths: number }) {
+  const level = Math.floor(xp / 250) + 1;
+  const levelProgress = xp % 250;
+  const badges = [
+    { title: "First steps", description: "Complete your first learning task", earned: completedTasks >= 1, icon: CheckCircle2 },
+    { title: "Momentum builder", description: "Complete five full learning days", earned: completedDays >= 5, icon: Flame },
+    { title: "Consistent learner", description: "Complete ten full learning days", earned: completedDays >= 10, icon: Activity },
+    { title: "Dedicated practitioner", description: "Complete fifty learning tasks", earned: completedTasks >= 50, icon: GraduationCap },
+    { title: "Path creator", description: "Save your first personalized learning path", earned: totalPaths >= 1, icon: BookOpen },
+    { title: "Journey complete", description: "Complete all tasks in a learning path", earned: completedDays >= 45, icon: Trophy },
+  ];
+  const earned = badges.filter(badge => badge.earned).length;
+  return <div className="np-achievements">
+    <section className="np-reward-hero"><div className="np-level-orb"><small>LEVEL</small><b>{level}</b></div><div><small>YOUR LEARNING LEVEL</small><h2>{level < 3 ? "Curious explorer" : level < 6 ? "Hands-on builder" : level < 10 ? "Skilled practitioner" : "Master learner"}</h2><p>{xp.toLocaleString()} experience points earned from your saved progress.</p><div className="np-progress-track large"><i style={{ width: `${levelProgress / 250 * 100}%` }}/></div><small>{levelProgress} / 250 XP to level {level + 1}</small></div><div className="np-reward-total"><Zap size={18}/><b>{xp.toLocaleString()}</b><small>TOTAL XP</small></div></section>
+    <section className="np-panel"><div className="np-panel-head"><div><small>UNLOCKED THROUGH REAL PROGRESS</small><h3>Achievement badges</h3></div><span className="np-source-tag"><Award size={13}/>{earned}/{badges.length} unlocked</span></div><div className="np-badge-grid">{badges.map(badge => { const Icon = badge.icon; return <article className={`np-badge ${badge.earned ? "earned" : ""}`} key={badge.title}><span><Icon size={20}/></span><div><b>{badge.title}</b><small>{badge.description}</small></div><strong>{badge.earned ? "Unlocked" : "Locked"}</strong></article>; })}</div></section>
+  </div>;
 }
