@@ -161,7 +161,7 @@ test("Cloudflare BGE-M3 rejects vectors that do not match vector(1024)", async (
       EMBEDDING_DIMENSIONS: "1024",
     }));
     service.recordUsage = async () => {};
-    await assert.rejects(() => service.embed(makeReq(), ["sample embedding text"]), /dimensions did not match vector\\(1024\\)/);
+    await assert.rejects(() => service.embed(makeReq(), ["sample embedding text"]), /dimensions did not match vector\(1024\)/);
   } finally {
     global.fetch = originalFetch;
   }
