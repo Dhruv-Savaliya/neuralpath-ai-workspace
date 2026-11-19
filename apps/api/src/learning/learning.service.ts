@@ -16,15 +16,49 @@ import {
 import type { RecommendationFeedbackDto } from "./dto/recommendation-feedback.dto";
 import type { AcceptRecommendationDto } from "./dto/accept-recommendation.dto";
 
-const PHASES = [
-  { name: "Python foundations", firstDay: 1, lastDay: 7 },
-  { name: "Math & data", firstDay: 8, lastDay: 12 },
-  { name: "Machine learning", firstDay: 13, lastDay: 20 },
-  { name: "Deep learning", firstDay: 21, lastDay: 25 },
-  { name: "LLMs & GenAI", firstDay: 26, lastDay: 32 },
-  { name: "AI application engineering", firstDay: 33, lastDay: 38 },
-  { name: "Portfolio & shipping", firstDay: 39, lastDay: 45 },
-] as const;
+const PHASE_LENGTH_DAYS = 7;
+
+function topicForDay(items: Array<{ title: string; description: string }>, day: number): string {
+  const item = items.find(candidate => {
+    const titleDay = Number(candidate.title.match(/^Day\s+(\d+)/i)?.[1]);
+    return titleDay === day;
+  });
+  if (!item) return "";
+  const description = item.description.trim();
+  const separator = description.search(/\s[—–-]\s/);
+  const fromDescription = separator > 0 ? description.slice(0, separator).trim() : "";
+  const fromTitle = item.title
+    .replace(/^Day\s+\d+\s*:\s*/i, "")
+    .replace(/^(lesson|exercise|resource|project)\s*[—–:-]\s*/i, "")
+    .trim();
+  return (fromDescription || fromTitle).slice(0, 64);
+}
+
+function buildRoadmapPhases(
+  pathItems: Array<{ title: string; description: string; position: number; status: string }>,
+  completedPositions: Set<number>,
+) {
+  if (!pathItems.length) return [];
+  const maxDay = Math.ceil((Math.max(...pathItems.map(item => item.position)) + 1) / 4);
+  const phases = [];
+  for (let firstDay = 1; firstDay <= maxDay; firstDay += PHASE_LENGTH_DAYS) {
+    const lastDay = Math.min(firstDay + PHASE_LENGTH_DAYS - 1, maxDay);
+    const startPosition = (firstDay - 1) * 4;
+    const endPosition = lastDay * 4;
+    const phaseItems = pathItems.filter(item => item.position >= startPosition && item.position < endPosition);
+    const topic = topicForDay(pathItems, firstDay);
+    const completedTasks = phaseItems.filter(item => completedPositions.has(item.position)).length;
+    phases.push({
+      name: topic || `Learning days ${firstDay}–${lastDay}`,
+      firstDay,
+      lastDay,
+      completedTasks,
+      totalTasks: phaseItems.length,
+      progressPercent: phaseItems.length ? Math.round(completedTasks / phaseItems.length * 100) : 0,
+    });
+  }
+  return phases;
+}
 
 function weeklyActivity(values: string[], timeZone: string, now: number) {
   const counts = new Map<string, number>();
@@ -120,17 +154,7 @@ export class LearningService {
     } = context;
     const completedPositions = new Set(completedItems.map(item => item.position));
 
-    const phaseProgress = PHASES.map(phase => {
-      const start = (phase.firstDay - 1) * 4;
-      const end = phase.lastDay * 4;
-      const phaseItems = pathItems.filter(item => item.position >= start && item.position < end);
-      const done = phaseItems.filter(item => completedPositions.has(item.position)).length;
-      return {
-        name: phase.name, firstDay: phase.firstDay, lastDay: phase.lastDay,
-        completedTasks: done, totalTasks: phaseItems.length,
-        progressPercent: phaseItems.length ? Math.round((done / phaseItems.length) * 100) : 0,
-      };
-    });
+    const phaseProgress = buildRoadmapPhases(pathItems, completedPositions);
 
     const nextTasks = pathItems
       .filter(item => (progressByItem.get(item.id)?.status ?? item.status) !== "completed")
