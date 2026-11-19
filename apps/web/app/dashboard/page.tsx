@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { signOut } from "../actions/auth";
@@ -93,6 +93,7 @@ export default function Home() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const reduceMotion = useReducedMotion();
 
   const refresh = useCallback(async () => {
@@ -128,6 +129,18 @@ export default function Home() {
       if (mounted) setLoading(false);
     });
     return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    function handleSearchShortcut(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen(true);
+        window.requestAnimationFrame(() => searchInputRef.current?.focus());
+      }
+    }
+    window.addEventListener("keydown", handleSearchShortcut);
+    return () => window.removeEventListener("keydown", handleSearchShortcut);
   }, []);
 
   const selectedPath: ApiPath | undefined = dashboard?.paths.find(path => path.id === selectedPathId);
@@ -275,6 +288,7 @@ export default function Home() {
           <div className={`np-global-search ${searchOpen ? "mobile-open" : ""}`}>
             <Search size={16} aria-hidden="true"/>
             <input
+              ref={searchInputRef}
               aria-label="Search learning tasks and goals"
               placeholder="Search your learning space..."
               value={searchQuery}
