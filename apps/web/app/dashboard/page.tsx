@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import Image from "next/image";
 import { signOut } from "../actions/auth";
 import {
   Activity, ArrowRight, ArrowUpRight, Award, BookOpen, BrainCircuit, CalendarDays,
   CheckCircle2, ChevronLeft, ChevronRight, Circle,
   Flame, GraduationCap, LayoutDashboard, LoaderCircle, LogOut, Menu,
-  Plus, RefreshCw, Rocket, Sparkles, Target, Trophy, UserRound, X, Zap,
+  Plus, RefreshCw, Rocket, Search, Sparkles, Target, Trophy, UserRound, X, Zap,
 } from "lucide-react";
 import WorkspaceGoalsPanel from "./workspace-goals";
 import WorkspaceProfilePanel from "./workspace-profile";
@@ -23,6 +24,9 @@ import {
 } from "../../lib/api/client";
 
 type Tab = "overview" | "roadmap" | "insights" | "goals" | "profile" | "achievements" | "ai";
+type DashboardSearchResult =
+  | { kind: "task"; id: string; title: string; detail: string; day: number }
+  | { kind: "goal"; id: string; title: string; detail: string };
 const navItems: Array<{ id: Tab; label: string; icon: typeof LayoutDashboard }> = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "roadmap", label: "Learning path", icon: BookOpen },
@@ -87,6 +91,8 @@ export default function Home() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const reduceMotion = useReducedMotion();
 
   const refresh = useCallback(async () => {
@@ -136,6 +142,19 @@ export default function Home() {
   const weekly = insights?.activity.weekly ?? [];
   const weeklyMax = Math.max(1, ...weekly.map(week => week.completedTasks));
   const stats = dashboard?.stats;
+  const searchResults = useMemo<DashboardSearchResult[]>(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    if (!query) return [];
+    const taskResults = items
+      .filter(item => `${item.title} ${item.description}`.toLocaleLowerCase().includes(query))
+      .slice(0, 4)
+      .map(item => ({ kind: "task" as const, id: item.id, title: item.title.replace(/^Day\\s+\\d+\\s*:\\s*/i, ""), detail: `Learning task · Day ${getDay(item)}`, day: getDay(item) }));
+    const goalResults = (dashboard?.goals ?? [])
+      .filter(goal => `${goal.title} ${goal.category} ${goal.desired_outcome}`.toLocaleLowerCase().includes(query))
+      .slice(0, 3)
+      .map(goal => ({ kind: "goal" as const, id: goal.id, title: goal.title, detail: `Learning goal · ${goal.category}` }));
+    return [...taskResults, ...goalResults].slice(0, 6);
+  }, [dashboard?.goals, items, searchQuery]);
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -167,6 +186,17 @@ export default function Home() {
     } finally {
       setSavingItem("");
     }
+  }
+
+  function openSearchResult(result: DashboardSearchResult) {
+    if (result.kind === "task") {
+      setActiveDay(result.day);
+      changeTab("roadmap");
+    } else {
+      changeTab("goals");
+    }
+    setSearchQuery("");
+    setSearchOpen(false);
   }
 
   function changeTab(next: Tab) {
@@ -203,7 +233,7 @@ export default function Home() {
       {mobileNavOpen ? <button className="np-scrim" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)}/> : null}
       <aside className={`np-sidebar ${mobileNavOpen ? "np-sidebar-open" : ""}`}>
         <div className="np-brand">
-          <div className="np-brand-mark"><BrainCircuit size={21}/></div>
+          <div className="np-brand-mark"><Image src="/icon.svg" alt="" width={29} height={29} priority/></div>
           <div><b>neural<span>path</span></b><small>YOUR LEARNING OS</small></div>
           <button className="np-mobile-close" onClick={() => setMobileNavOpen(false)} aria-label="Close menu"><X size={18}/></button>
         </div>
@@ -242,7 +272,34 @@ export default function Home() {
             <button className="np-mobile-menu" aria-label="Open menu" onClick={() => setMobileNavOpen(true)}><Menu size={20}/></button>
             <div className="np-breadcrumb">Workspace <ChevronRight size={14}/><b>{navItems.find(item => item.id === tab)?.label}</b></div>
           </div>
+          <div className={`np-global-search ${searchOpen ? "mobile-open" : ""}`}>
+            <Search size={16} aria-hidden="true"/>
+            <input
+              aria-label="Search learning tasks and goals"
+              placeholder="Search your learning space..."
+              value={searchQuery}
+              onChange={event => setSearchQuery(event.target.value)}
+              onFocus={() => setSearchOpen(true)}
+              onKeyDown={event => {
+                if (event.key === "Escape") setSearchOpen(false);
+                if (event.key === "Enter" && searchResults[0]) openSearchResult(searchResults[0]);
+              }}
+            />
+            {searchQuery ? <button type="button" aria-label="Clear search" onClick={() => setSearchQuery("")}><X size={14}/></button> : <kbd>⌘ K</kbd>}
+            {searchOpen && searchQuery.trim() ? (
+              <div className="np-search-results" role="listbox" aria-label="Search results">
+                {searchResults.length ? searchResults.map(result => (
+                  <button type="button" role="option" aria-selected="false" key={`${result.kind}-${result.id}`} onMouseDown={event => event.preventDefault()} onClick={() => openSearchResult(result)}>
+                    <span className="np-search-result-icon">{result.kind === "task" ? <BookOpen size={15}/> : <Target size={15}/>}</span>
+                    <span><b>{result.title}</b><small>{result.detail}</small></span>
+                    <ArrowUpRight size={14}/>
+                  </button>
+                )) : <p>No matching tasks or goals. Try another keyword.</p>}
+              </div>
+            ) : null}
+          </div>
           <div className="np-top-actions">
+            <button className="np-search-toggle" type="button" aria-label={searchOpen ? "Close search" : "Open search"} aria-expanded={searchOpen} onClick={() => setSearchOpen(value => !value)}><Search size={17}/></button>
             <span className="np-date"><CalendarDays size={14}/>{formatDate()}</span>
             <span className="np-xp"><Zap size={14}/>{(stats?.xp ?? 0).toLocaleString()} <small>XP</small></span>
             <button className="np-refresh" onClick={() => void handleRefresh()} disabled={refreshing} aria-label="Refresh dashboard"><RefreshCw size={16} className={refreshing ? "np-spin" : ""}/></button>
@@ -279,7 +336,7 @@ export default function Home() {
                     {selectedPath ? "Continue learning" : "Create your first goal"} <ArrowUpRight size={16}/>
                   </button>
                 </div>
-                <div className="np-hero-art" aria-hidden="true"><div className="np-orbit one"/><div className="np-orbit two"/><div className="np-orb-core"><BrainCircuit size={47}/></div><span className="np-float f1"><Target size={13}/> FOCUS</span><span className="np-float f2"><Sparkles size={13}/> GROW</span></div>
+                <div className="np-hero-art" aria-hidden="true"><div className="np-orbit one"/><div className="np-orbit two"/><div className="np-orb-core"><BrainCircuit size={47}/></div><span className="np-float f1"><Target size={13}/> FOCUS</span><span className="np-float f2"><Sparkles size={13}/> GROW</span><span className="np-hero-star">✦</span></div>
               </section>
 
               <div className="np-kpi-grid">
@@ -331,6 +388,11 @@ export default function Home() {
                   <div className="np-panel-head"><div><small>PERSONALIZED FOR YOU</small><h3>Learning preferences</h3></div><button className="np-text-action" onClick={() => changeTab("profile")}>Edit profile <ArrowUpRight size={14}/></button></div>
                   <div className="np-preference-grid"><Preference label="Profession" value={dashboard?.profile?.profession?.replaceAll("_", " ") || "Not set"}/><Preference label="Experience" value={dashboard?.profile?.experience_level?.replaceAll("_", " ") || "Not set"}/><Preference label="Learning pace" value={insights?.preferences?.learning_pace || "Not set"}/><Preference label="Weekly study time" value={insights?.preferences ? `${insights.preferences.weekly_minutes} min` : "Not set"}/></div>
                   <div className="np-quote"><Sparkles size={15}/><span>Small, consistent steps turn ambitious goals into real skills.</span></div>
+                </section>
+                <section className="np-panel np-ai-companion">
+                  <div className="np-ai-companion-orb"><BrainCircuit size={30}/><span>✦</span></div>
+                  <div className="np-ai-companion-copy"><small>YOUR LEARNING COMPANION</small><h3>Need a little clarity?</h3><p>Ask your AI tutor to explain a concept, explore an idea or help with your next step.</p></div>
+                  <button className="np-ai-launch" onClick={() => changeTab("ai")}>Open AI tutor <ArrowUpRight size={14}/></button>
                 </section>
               </div>
             </>
