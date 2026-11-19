@@ -325,6 +325,10 @@ export class AiService {
         }
         await this.recordUsage(req, "cloudflare", model, "embedding",
           missingTexts.reduce((sum, value) => sum + value.length, 0), 0);
+        const finalized = await req.supabase.rpc("complete_cloudflare_neurons", {
+          p_reservation_id: reserveRow.reservation_id,
+        });
+        if (finalized.error) this.logger.warn(`Cloudflare neuron reservation finalization failed: ${finalized.error.code ?? "database_error"}`);
       } catch (error) {
         await req.supabase.rpc("release_cloudflare_neurons", {
           p_reservation_id: reserveRow.reservation_id,
@@ -391,7 +395,12 @@ export class AiService {
         throw new ProviderError(`${provider} application safety budget reached.`, 429);
       }
       try {
-        return await run();
+        const answer = await run();
+        const finalized = await req.supabase.rpc("complete_ai_generation", {
+          p_reservation_id: row.reservation_id,
+        });
+        if (finalized.error) this.logger.warn(`${provider} quota reservation finalization failed: ${finalized.error.code ?? "database_error"}`);
+        return answer;
       } catch (error) {
         await req.supabase.rpc("release_ai_generation", { p_reservation_id: row.reservation_id })
           .then(({ error: releaseError }) => {
