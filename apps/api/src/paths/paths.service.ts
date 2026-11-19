@@ -7,7 +7,7 @@ type GeneratedTask = { title: string; description: string; item_type: "lesson" |
 type GeneratedDay = { day: number; title: string; focus: string; tasks: GeneratedTask[] };
 type GeneratedCurriculum = { title: string; description: string; days: GeneratedDay[] };
 
-const DAYS_PER_BATCH = 5;
+const DAYS_PER_BATCH = 3;
 const TOTAL_DAYS = 45;
 const TASKS_PER_DAY = 4;
 
@@ -67,7 +67,7 @@ export class PathsService {
     }
     const days: GeneratedDay[] = [];
 
-    // Small independently validated batches keep responses well below provider output limits.
+    // Three-day independently validated batches keep JSON responses below Groq's observed output-token ceiling.
     for (let startDay = 1; startDay <= TOTAL_DAYS; startDay += DAYS_PER_BATCH) {
       const endDay = Math.min(startDay + DAYS_PER_BATCH - 1, TOTAL_DAYS);
       const prompt = [

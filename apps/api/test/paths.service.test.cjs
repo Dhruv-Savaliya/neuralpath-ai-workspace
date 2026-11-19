@@ -114,14 +114,14 @@ test("bootstrap generates nine validated batches and persists exactly 180 ordere
       assert.equal(options.jsonMode, true);
       assert.equal(options.preferFallback, false);
       batchCalls += 1;
-      const start = (batchCalls - 1) * 5 + 1;
-      return { answer: JSON.stringify(batch(start, 5)), provider: "gemini", model: "test-model" };
+      const start = (batchCalls - 1) * 3 + 1;
+      return { answer: JSON.stringify(batch(start, 3)), provider: "gemini", model: "test-model" };
     },
   };
   const service = new PathsService(ai);
   const result = await service.bootstrap({ user: { id: "learner-1" }, supabase: db }, { goal_id: goal.id });
 
-  assert.equal(batchCalls, 9);
+  assert.equal(batchCalls, 15);
   assert.match(firstPrompt, /founder/);
   assert.match(firstPrompt, /business/);
   assert.match(firstPrompt, /customer problems/);
