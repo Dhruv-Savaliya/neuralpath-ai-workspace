@@ -163,27 +163,22 @@ export class AiService {
 
   async chat(req: AuthenticatedRequest, dto: ChatDto) {
     const question = dto.question.trim();
-    let conversationId = dto.conversation_id;
+    const conversationId = dto.conversation_id;
     if (conversationId) {
       const { data, error } = await req.supabase.from("ai_conversations")
         .select("id").eq("id", conversationId).eq("user_id", req.user.id).maybeSingle();
       if (error || !data) throw new NotFoundException("Tutor conversation was not found.");
-    } else {
-      const { data, error } = await req.supabase.from("ai_conversations")
-        .insert({ user_id: req.user.id, title: question.slice(0, 100) })
-        .select("id").single();
-      if (error || !data) throw new InternalServerErrorException("Unable to create tutor conversation.");
-      conversationId = data.id;
     }
-    if (!conversationId) throw new InternalServerErrorException("Unable to identify tutor conversation.");
 
-    const { data: historyRows, error: historyError } = await req.supabase
-      .from("ai_messages")
-      .select("role,content")
-      .eq("conversation_id", conversationId)
-      .eq("user_id", req.user.id)
-      .order("created_at", { ascending: false })
-      .limit(12);
+    const historyQuery = conversationId
+      ? req.supabase.from("ai_messages")
+          .select("role,content")
+          .eq("conversation_id", conversationId)
+          .eq("user_id", req.user.id)
+          .order("created_at", { ascending: false })
+          .limit(12)
+      : Promise.resolve({ data: [], error: null });
+    const { data: historyRows, error: historyError } = await historyQuery;
     if (historyError) throw new InternalServerErrorException("Unable to load tutor context.");
 
     const [queryEmbedding] = await this.embed(req, [question]);
@@ -233,7 +228,7 @@ export class AiService {
     }));
     const validated = validateAnswerCitations(generated.answer, candidateSources);
     const { data: savedConversationId, error: saveError } = await req.supabase.rpc("save_ai_exchange", {
-      p_conversation_id: conversationId,
+      p_conversation_id: conversationId ?? null,
       p_question: question,
       p_answer: validated.answer,
       p_sources: validated.sources,
