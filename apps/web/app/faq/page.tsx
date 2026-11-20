@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import { Shell, Intro } from "../components/marketing";
+
+export const metadata: Metadata = {
+  title: "Frequently Asked Questions",
+  description: "Answers about NeuralPath accounts, learning paths, saved AI tutor conversations, knowledge sources and learner data.",
+};
 
 const qs = [
   ["Who is NeuralPath for?", "Anyone who wants to learn or grow: students, professionals, career changers, and lifelong learners across many fields."],
