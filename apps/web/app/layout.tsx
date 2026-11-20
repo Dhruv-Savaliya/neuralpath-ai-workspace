@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import ThemeControl from "./components/theme-control";
 import "./globals.css";
+import "./dashboard-mobile.css";
 
 export const metadata: Metadata = {
   title: { default: "NeuralPath — Your goals. Your path. Your growth.", template: "%s | NeuralPath" },
