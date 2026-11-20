@@ -175,6 +175,7 @@ export class AiService {
       if (error || !data) throw new InternalServerErrorException("Unable to create tutor conversation.");
       conversationId = data.id;
     }
+    if (!conversationId) throw new InternalServerErrorException("Unable to identify tutor conversation.");
 
     const { data: historyRows, error: historyError } = await req.supabase
       .from("ai_messages")
@@ -222,6 +223,13 @@ export class AiService {
     ].join("\n");
 
     const generated = await this.generate(req, prompt);
+    const { error: userMessageError } = await req.supabase.from("ai_messages").insert({
+      conversation_id: conversationId,
+      user_id: req.user.id,
+      role: "user",
+      content: question,
+    });
+    if (userMessageError) throw new InternalServerErrorException("Unable to save your question.");
     const candidateSources = sources.map((source, index) => ({
       citation: `S${index + 1}`,
       title: source.source_title,
