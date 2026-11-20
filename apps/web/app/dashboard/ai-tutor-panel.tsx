@@ -103,6 +103,7 @@ export default function AiTutorPanel() {
         result,
       }]);
     } catch (cause) {
+      setMessages(previous => previous.filter(message => message.id !== userMessage.id));
       setQuestion(prompt);
       setError(cause instanceof Error ? cause.message : "NeuralPath could not answer right now. Your question is ready to retry.");
     } finally {
