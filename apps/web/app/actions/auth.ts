@@ -61,6 +61,33 @@ export async function signIn(formData: FormData) {
   redirect(next);
 }
 
+export async function requestPasswordReset(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    redirect("/auth/forgot-password?error=invalid_input");
+  }
+  const supabase = await createClient();
+  const redirectBaseUrl = await getAuthRedirectBaseUrl();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${redirectBaseUrl}/auth/callback?next=/auth/update-password`,
+  });
+  if (error) redirect("/auth/forgot-password?error=request_failed");
+  redirect("/auth/forgot-password?sent=1");
+}
+
+export async function updatePassword(formData: FormData) {
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 8 || password.length > 128) {
+    redirect("/auth/update-password?error=invalid_password");
+  }
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) redirect("/auth/sign-in?error=recovery_session_invalid");
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) redirect("/auth/update-password?error=update_failed");
+  redirect("/auth/sign-in?error=password_updated");
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();

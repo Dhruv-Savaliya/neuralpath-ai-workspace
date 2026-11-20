@@ -124,14 +124,17 @@ export type KnowledgeSource = {
   chunks: number;
 };
 
+export type AiConversation = { id: string; title: string; created_at: string; updated_at: string };
+
 export type AiChatResponse = {
+  conversation_id: string;
   answer: string;
   provider: string;
   model: string;
   sources: Array<{ citation: string; title: string; url: string | null; similarity: number }>;
 };
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 25_000): Promise<T> {
   if (!baseUrl) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
   const supabase = createClient();
   const { data, error } = await supabase.auth.getSession();
@@ -143,7 +146,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     response = await fetch(`${baseUrl}/api/v1${path}`, {
       ...init,
       cache: "no-store",
-      signal: init.signal ?? AbortSignal.timeout(25_000),
+      signal: init.signal ?? AbortSignal.timeout(timeoutMs),
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
@@ -205,10 +208,12 @@ export const neuralPathApi = {
   saveProgress: (input: { path_item_id: string; status: "in_progress" | "completed"; reflection?: string }) =>
     request<{ id: string; status: string; completed_at: string | null }>("/progress", { method: "POST", body: JSON.stringify(input) }),
   getKnowledgeSources: () => request<KnowledgeSource[]>("/ai/knowledge"),
+  getAiConversations: () => request<AiConversation[]>("/ai/conversations"),
+  getAiConversation: (id: string) => request<{ conversation: AiConversation; messages: Array<{ id: string; role: "user" | "assistant"; content: string; created_at: string }> }>(`/ai/conversations/${id}`),
   ingestKnowledge: (input: { title: string; content: string; source_url?: string }) =>
     request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge", { method: "POST", body: JSON.stringify(input) }),
   deleteKnowledge: (sourceId: string) =>
     request<{ deleted: boolean; chunks_deleted: number }>(`/ai/knowledge/${sourceId}`, { method: "DELETE" }),
-  askAi: (question: string) =>
-    request<AiChatResponse>("/ai/chat", { method: "POST", body: JSON.stringify({ question }) }),
+  askAi: (question: string, conversationId?: string) =>
+    request<AiChatResponse>("/ai/chat", { method: "POST", body: JSON.stringify({ question, ...(conversationId ? { conversation_id: conversationId } : {}) }) }, 95_000),
 };

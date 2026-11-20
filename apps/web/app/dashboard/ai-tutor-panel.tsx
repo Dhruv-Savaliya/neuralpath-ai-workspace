@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AlertCircle, BookOpen, Bot, LoaderCircle, MessageCircle, Plus, Send, Trash2, UserRound } from "lucide-react";
-import { neuralPathApi, type AiChatResponse, type KnowledgeSource } from "../../lib/api/client";
+import { neuralPathApi, type AiChatResponse, type AiConversation, type KnowledgeSource } from "../../lib/api/client";
 
 type ChatMessage = {
   id: string;
@@ -15,6 +15,8 @@ export default function AiTutorPanel() {
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [sourcesLoading, setSourcesLoading] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversations, setConversations] = useState<AiConversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -36,6 +38,23 @@ export default function AiTutorPanel() {
   }, []);
 
   useEffect(() => { void loadSources(); }, [loadSources]);
+
+  const loadConversations = useCallback(async () => {
+    try { setConversations(await neuralPathApi.getAiConversations()); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load tutor history."); }
+  }, []);
+
+  useEffect(() => { void loadConversations(); }, [loadConversations]);
+
+  async function openConversation(id: string) {
+    if (!id) { setActiveConversationId(null); setMessages([]); return; }
+    setError("");
+    try {
+      const result = await neuralPathApi.getAiConversation(id);
+      setActiveConversationId(id);
+      setMessages(result.messages.map(message => ({ id: message.id, role: message.role, text: message.content })));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to open this conversation."); }
+  }
 
   async function addSource(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,7 +93,9 @@ export default function AiTutorPanel() {
     setLoading(true);
     setError("");
     try {
-      const result = await neuralPathApi.askAi(prompt);
+      const result = await neuralPathApi.askAi(prompt, activeConversationId ?? undefined);
+      setActiveConversationId(result.conversation_id);
+      void loadConversations();
       setMessages(previous => [...previous, {
         id: crypto.randomUUID(),
         role: "assistant",
@@ -82,6 +103,7 @@ export default function AiTutorPanel() {
         result,
       }]);
     } catch (cause) {
+      setMessages(previous => previous.filter(message => message.id !== userMessage.id));
       setQuestion(prompt);
       setError(cause instanceof Error ? cause.message : "NeuralPath could not answer right now. Your question is ready to retry.");
     } finally {

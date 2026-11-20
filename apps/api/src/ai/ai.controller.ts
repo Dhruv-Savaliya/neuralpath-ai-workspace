@@ -28,6 +28,16 @@ export class AiController {
     return this.ai.deleteKnowledge(req, sourceId);
   }
 
+  @Get("conversations")
+  listConversations(@Req() req: AuthenticatedRequest) {
+    return this.ai.listConversations(req);
+  }
+
+  @Get("conversations/:conversationId")
+  getConversation(@Req() req: AuthenticatedRequest, @Param("conversationId") conversationId: string) {
+    return this.ai.getConversation(req, conversationId);
+  }
+
   @Post("chat")
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   chat(@Req() req: AuthenticatedRequest, @Body() dto: ChatDto) {
