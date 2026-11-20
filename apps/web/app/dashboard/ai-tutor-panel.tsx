@@ -61,19 +61,34 @@ export default function AiTutorPanel() {
 
   async function addSource(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (title.trim().length < 3 || content.trim().length < 40) {
-      setError("Add a title and at least 40 characters of learning material.");
+    const pastedContent = content.trim();
+    const webpageUrl = sourceUrl.trim();
+    if (pastedContent.length >= 40 && title.trim().length < 3) {
+      setError("Add a title with at least 3 characters for pasted learning material.");
+      return;
+    }
+    if (pastedContent.length < 40 && !webpageUrl) {
+      setError("Paste at least 40 characters of notes or enter a public HTTPS webpage URL.");
+      return;
+    }
+    if (webpageUrl && !pastedContent && title.trim().length > 0 && title.trim().length < 3) {
+      setError("A custom webpage title must contain at least 3 characters.");
       return;
     }
     setIngesting(true);
     setError("");
     setNotice("");
     try {
-      const result = await neuralPathApi.ingestKnowledge({
-        title: title.trim(),
-        content: content.trim(),
-        ...(sourceUrl.trim() ? { source_url: sourceUrl.trim() } : {}),
-      });
+      const result = pastedContent.length >= 40
+        ? await neuralPathApi.ingestKnowledge({
+            title: title.trim(),
+            content: pastedContent,
+            ...(webpageUrl ? { source_url: webpageUrl } : {}),
+          })
+        : await neuralPathApi.ingestWebsite({
+            url: webpageUrl,
+            ...(title.trim() ? { title: title.trim() } : {}),
+          });
       setTitle("");
       setContent("");
       setSourceUrl("");
@@ -264,13 +279,13 @@ export default function AiTutorPanel() {
                 <input type="url" value={sourceUrl} onChange={event => setSourceUrl(event.target.value)} maxLength={2048} placeholder="https://…"/>
               </label>
               <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Text content
-                <textarea value={content} onChange={event => setContent(event.target.value)} maxLength={50000} minLength={40} rows={8} required placeholder="Paste your notes or learning material here (at least 40 characters)…" style={{ resize: "vertical" }}/>
+                <textarea value={content} onChange={event => setContent(event.target.value)} maxLength={50000} minLength={0} rows={8} placeholder="Paste notes (at least 40 characters), or leave blank to import the webpage URL…" style={{ resize: "vertical" }}/>
               </label>
-              <button className="primary-btn" type="submit" disabled={ingesting || title.trim().length < 3 || content.trim().length < 40}>
+              <button className="primary-btn" type="submit" disabled={ingesting || (content.trim().length < 40 && !sourceUrl.trim()) || (content.trim().length >= 40 && title.trim().length < 3)}>
                 {ingesting ? <LoaderCircle size={15}/> : <Plus size={15}/>} {ingesting ? "Embedding material…" : "Save to knowledge library"}
               </button>
               <small style={{ color: "var(--muted,#9ca3af)", lineHeight: 1.5 }}>
-                Your text is split into chunks and embedded with Cloudflare BGE-M3. Source URLs are stored as references; the API does not fetch them.
+                Paste text or import a public HTTPS webpage. Webpage imports are fetched securely, cleaned of scripts and navigation, then split into chunks and embedded with Cloudflare BGE-M3. PDF, DOCX and video transcript imports are not supported yet.
               </small>
             </form>
           </details>

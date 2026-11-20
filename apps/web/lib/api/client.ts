@@ -212,6 +212,8 @@ export const neuralPathApi = {
   getAiConversation: (id: string) => request<{ conversation: AiConversation; messages: Array<{ id: string; role: "user" | "assistant"; content: string; sources: Array<{ citation: string; title: string; url: string | null; similarity: number }>; created_at: string }> }>(`/ai/conversations/${id}`),
   ingestKnowledge: (input: { title: string; content: string; source_url?: string }) =>
     request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge", { method: "POST", body: JSON.stringify(input) }),
+  ingestWebsite: (input: { url: string; title?: string }) =>
+    request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge/website", { method: "POST", body: JSON.stringify(input) }),
   deleteKnowledge: (sourceId: string) =>
     request<{ deleted: boolean; chunks_deleted: number }>(`/ai/knowledge/${sourceId}`, { method: "DELETE" }),
 
