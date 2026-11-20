@@ -185,14 +185,6 @@ export class AiService {
       .limit(12);
     if (historyError) throw new InternalServerErrorException("Unable to load tutor context.");
 
-    const { error: userMessageError } = await req.supabase.from("ai_messages").insert({
-      conversation_id: conversationId,
-      user_id: req.user.id,
-      role: "user",
-      content: question,
-    });
-    if (userMessageError) throw new InternalServerErrorException("Unable to save your question.");
-
     const [queryEmbedding] = await this.embed(req, [question]);
     const { data, error } = await req.supabase.rpc("match_knowledge_chunks", {
       query_embedding: queryEmbedding,
@@ -573,7 +565,7 @@ export class AiService {
                 ...(jsonMode ? { responseMimeType: "application/json" } : {}),
               },
             }),
-            signal: AbortSignal.timeout(60000),
+            signal: AbortSignal.timeout(30000),
           },
         );
         if (attempt === 0 && [408, 500, 502, 503, 504].includes(response.status)) {
@@ -624,7 +616,7 @@ export class AiService {
             max_tokens: maxOutputTokens,
             ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
           }),
-          signal: AbortSignal.timeout(45000),
+          signal: AbortSignal.timeout(25000),
         });
       } catch {
         throw new ProviderError("Groq network request failed.", 503);
