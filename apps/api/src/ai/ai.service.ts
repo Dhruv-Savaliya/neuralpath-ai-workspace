@@ -152,13 +152,13 @@ export class AiService {
     if (error || !conversation) throw new NotFoundException("Tutor conversation was not found.");
     const { data: messages, error: messageError } = await req.supabase
       .from("ai_messages")
-      .select("id,role,content,created_at")
+      .select("id,role,content,sources,created_at")
       .eq("conversation_id", conversationId)
       .eq("user_id", req.user.id)
       .order("created_at", { ascending: true })
       .limit(100);
     if (messageError) throw new InternalServerErrorException("Unable to load tutor messages.");
-    return { conversation, messages: messages ?? [] };
+    return { conversation, messages: (messages ?? []).map(message => ({ ...message, sources: Array.isArray(message.sources) ? message.sources : [] })) };
   }
 
   async chat(req: AuthenticatedRequest, dto: ChatDto) {
@@ -236,6 +236,7 @@ export class AiService {
       p_conversation_id: conversationId,
       p_question: question,
       p_answer: validated.answer,
+      p_sources: validated.sources,
     });
     if (saveError || !savedConversationId) {
       this.logger.error(`Tutor exchange persistence failed: ${saveError?.code ?? "missing_conversation_id"}`);
