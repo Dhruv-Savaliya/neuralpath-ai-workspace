@@ -124,7 +124,10 @@ export type KnowledgeSource = {
   chunks: number;
 };
 
+export type AiConversation = { id: string; title: string; created_at: string; updated_at: string };
+
 export type AiChatResponse = {
+  conversation_id: string;
   answer: string;
   provider: string;
   model: string;
@@ -204,11 +207,13 @@ export const neuralPathApi = {
   bootstrapPath: (goal_id: string) => request<ApiPath>("/paths/bootstrap", { method: "POST", body: JSON.stringify({ goal_id }) }),
   saveProgress: (input: { path_item_id: string; status: "in_progress" | "completed"; reflection?: string }) =>
     request<{ id: string; status: string; completed_at: string | null }>("/progress", { method: "POST", body: JSON.stringify(input) }),
-  getKnowledgeSources: () => request<KnowledgeSource[]>("/ai/knowledge"),\n  getAiConversations: () => request<AiConversation[]>("/ai/conversations"),\n  getAiConversation: (id: string) => request<{ conversation: AiConversation; messages: Array<{ id: string; role: "user" | "assistant"; content: string; created_at: string }> }>(`/ai/conversations/${id}`),
+  getKnowledgeSources: () => request<KnowledgeSource[]>("/ai/knowledge"),
+  getAiConversations: () => request<AiConversation[]>("/ai/conversations"),
+  getAiConversation: (id: string) => request<{ conversation: AiConversation; messages: Array<{ id: string; role: "user" | "assistant"; content: string; created_at: string }> }>(`/ai/conversations/${id}`),
   ingestKnowledge: (input: { title: string; content: string; source_url?: string }) =>
     request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge", { method: "POST", body: JSON.stringify(input) }),
   deleteKnowledge: (sourceId: string) =>
     request<{ deleted: boolean; chunks_deleted: number }>(`/ai/knowledge/${sourceId}`, { method: "DELETE" }),
-  askAi: (question: string) =>
-    request<AiChatResponse>("/ai/chat", { method: "POST", body: JSON.stringify({ question }) }),
+  askAi: (question: string, conversationId?: string) =>
+    request<AiChatResponse>("/ai/chat", { method: "POST", body: JSON.stringify({ question, ...(conversationId ? { conversation_id: conversationId } : {}) }) }, 125_000),
 };
