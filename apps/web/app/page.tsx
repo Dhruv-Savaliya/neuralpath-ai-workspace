@@ -12,7 +12,7 @@ import { Shell } from "./components/marketing";
 
 const highlights = [
   { icon: Target, title: "Personal learning paths", copy: "Turn a goal into clear milestones and practical next steps." },
-  { icon: BrainCircuit, title: "AI learning companion", copy: "Ask questions, explore concepts and get help when you need it." },
+  { icon: BrainCircuit, title: "AI tutor for every subject", copy: "Get clear explanations, explore concepts and practise at your own pace." },
   { icon: TrendingUp, title: "Progress that makes sense", copy: "Keep track of completed tasks, learning momentum and goals." },
   { icon: Layers3, title: "Resources in one place", copy: "Bring lessons, notes, useful links and projects together." },
 ];
@@ -71,14 +71,14 @@ export default function Home() {
     <div className="np-home">
       <section className="np-home-hero">
         <div className="np-hero-stars" aria-hidden="true"/>
-        <motion.div className="np-home-hero-copy" initial={reduce?false:{opacity:0,y:22}} animate={{opacity:1,y:0}} transition={{duration:reduce?0:.7,ease:[.22,1,.36,1]}}>
+        <motion.div className="np-home-hero-copy" initial={false} animate={{opacity:1,y:0}} transition={{duration:reduce?0:.7,ease:[.22,1,.36,1]}}>
           <span className="np-kicker"><i/> LEARN · BUILD · GROW</span>
-          <h1>Your smart path<br/>to a <em>better tomorrow.</em></h1>
-          <p>Explore new skills, turn ideas into real projects, and build a learning journey that moves with you. Your goals set the direction. NeuralPath helps you take the next step.</p>
-          <div className="np-home-actions"><Link className="np-primary-action" href="/auth/sign-up">Start your journey <ArrowUpRight size={17}/></Link><Link className="np-secondary-action" href="/how-it-works"><Play size={14} fill="currentColor"/> See how it works</Link></div>
+          <h1>Your AI tutor<br/>for <em>every subject.</em></h1>
+          <p>Learn coding, mathematics, science, business, design and more with an AI tutor that explains concepts, adapts to your level and helps you practise.</p>
+          <div className="np-home-actions"><Link className="np-primary-action" href="/auth/sign-up">Try AI Tutor <ArrowUpRight size={17}/></Link><Link className="np-secondary-action" href="/how-it-works"><Play size={14} fill="currentColor"/> Explore learning paths</Link></div>
           <div className="np-hero-assurances"><span><ShieldIcon/> Built around your goals</span><span><LockKeyhole size={14}/> Your progress, your space</span></div>
         </motion.div>
-        <motion.div className="np-home-hero-art" initial={reduce?false:{opacity:0,scale:.94}} animate={{opacity:1,scale:1}} transition={{duration:reduce?0:.85,delay:.1}}><NeuralArtwork/></motion.div>
+        <motion.div className="np-home-hero-art" initial={false} animate={{opacity:1,scale:1}} transition={{duration:reduce?0:.85,delay:.1}}><NeuralArtwork/></motion.div>
         <div className="np-hero-bottomline"><span>ONE SPACE FOR YOUR NEXT CHAPTER</span><span>SCROLL TO EXPLORE ↓</span></div>
       </section>
 
@@ -101,7 +101,7 @@ export default function Home() {
 
       <section className="np-home-ai">
         <div className="np-ai-glow"/>
-        <Reveal className="np-ai-copy"><span className="np-kicker"><i/> AI THAT SUPPORTS YOUR PROGRESS</span><h2>Smart support.<br/><em>Your direction.</em></h2><p>Use AI to unpack tricky ideas, brainstorm a project or plan a practical next step. It&apos;s here to support your learning — not make your decisions for you.</p><Link className="np-primary-action" href="/features">Discover the AI experience <ArrowUpRight size={16}/></Link></Reveal>
+        <Reveal className="np-ai-copy"><span className="np-kicker"><i/> YOUR AI TUTOR, READY TO HELP</span><h2>Understand more.<br/><em>Learn with confidence.</em></h2><p>Ask about a difficult concept, get a step-by-step explanation, or explore a new subject. Use your learning materials as private context when you want answers grounded in your own notes.</p><Link className="np-primary-action" href="/features">Explore tutor features <ArrowUpRight size={16}/></Link></Reveal>
         <Reveal className="np-ai-feature-stack"><div><span><WandSparkles size={18}/></span><b>Make complex ideas clearer</b><small>Break a topic into understandable pieces.</small></div><div><span><BookOpen size={18}/></span><b>Learn by doing</b><small>Turn concepts into practice and projects.</small></div><div><span><Rocket size={18}/></span><b>Find your next step</b><small>Keep moving with a plan that can evolve.</small></div></Reveal>
       </section>
 
