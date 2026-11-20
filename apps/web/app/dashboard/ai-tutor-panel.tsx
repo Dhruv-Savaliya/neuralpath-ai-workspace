@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, BookOpen, Bot, LoaderCircle, MessageCircle, Plus, Send, Trash2, UserRound } from "lucide-react";
 import { neuralPathApi, type AiChatResponse, type AiConversation, type KnowledgeSource } from "../../lib/api/client";
 
@@ -26,6 +26,7 @@ export default function AiTutorPanel() {
   const [ingesting, setIngesting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const loadSources = useCallback(async () => {
     setSourcesLoading(true);
@@ -90,25 +91,27 @@ export default function AiTutorPanel() {
     const prompt = question.trim();
     if (prompt.length < 2 || loading) return;
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: "user", text: prompt };
-    setMessages(previous => [...previous, userMessage]);
+    const assistantId = crypto.randomUUID();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setMessages(previous => [...previous, userMessage, { id: assistantId, role: "assistant", text: "" }]);
     setQuestion("");
     setLoading(true);
     setError("");
     try {
-      const result = await neuralPathApi.askAi(prompt, activeConversationId ?? undefined);
+      const result = await neuralPathApi.askAiStream(prompt, activeConversationId ?? undefined,
+        token => setMessages(previous => previous.map(message => message.id === assistantId ? { ...message, text: message.text + token } : message)),
+        controller.signal,
+      );
       setActiveConversationId(result.conversation_id);
       void loadConversations();
-      setMessages(previous => [...previous, {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        text: result.answer,
-        result,
-      }]);
+      setMessages(previous => previous.map(message => message.id === assistantId ? { ...message, text: result.answer, result } : message));
     } catch (cause) {
-      setMessages(previous => previous.filter(message => message.id !== userMessage.id));
+      setMessages(previous => previous.filter(message => message.id !== assistantId && message.id !== userMessage.id));
       setQuestion(prompt);
       setError(cause instanceof Error ? cause.message : "NeuralPath could not answer right now. Your question is ready to retry.");
     } finally {
+      abortControllerRef.current = null;
       setLoading(false);
     }
   }
@@ -239,9 +242,12 @@ export default function AiTutorPanel() {
             <textarea id="neuralpath-ai-question" value={question} onChange={event => setQuestion(event.target.value)} maxLength={2000} minLength={2}
               placeholder="Ask about a topic, concept, or your uploaded notes…" rows={3} required
               style={{ width: "100%", resize: "vertical", borderRadius: 10, padding: 12, background: "var(--input,rgba(15,23,42,.35))", color: "inherit", border: "1px solid var(--border,rgba(148,163,184,.25))" }}/>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="primary-btn" type="submit" disabled={loading || question.trim().length < 2}>
-              {loading ? <LoaderCircle size={15}/> : <Send size={15}/>} Ask NeuralPath
+              {loading ? <LoaderCircle size={15}/> : <Send size={15}/>} {loading ? "Generating…" : "Ask NeuralPath"}
             </button>
+            {loading ? <button className="text-btn" type="button" onClick={() => abortControllerRef.current?.abort()}>Stop generating</button> : null}
+            </div>
           </form>
         </div>
 

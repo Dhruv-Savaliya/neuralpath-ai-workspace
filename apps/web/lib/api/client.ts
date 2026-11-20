@@ -214,6 +214,59 @@ export const neuralPathApi = {
     request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge", { method: "POST", body: JSON.stringify(input) }),
   deleteKnowledge: (sourceId: string) =>
     request<{ deleted: boolean; chunks_deleted: number }>(`/ai/knowledge/${sourceId}`, { method: "DELETE" }),
+
+  askAiStream: async (
+    question: string, conversationId: string | undefined, onToken: (token: string) => void, signal?: AbortSignal,
+  ): Promise<AiChatResponse> => {
+    if (!baseUrl) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (error || !token) throw new Error("Your session has expired. Please sign in again.");
+    const timeoutSignal = AbortSignal.timeout(120_000);
+    const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/api/v1/ai/chat/stream`, {
+        method: "POST", cache: "no-store", signal: requestSignal,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, Accept: "text/event-stream" },
+        body: JSON.stringify({ question, ...(conversationId ? { conversation_id: conversationId } : {}) }),
+      });
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === "TimeoutError") throw new Error("This is taking longer than expected. Please try again.");
+      if (cause instanceof DOMException && cause.name === "AbortError") throw new Error("Generation stopped.");
+      throw new Error("We couldn't reach NeuralPath. Check your internet connection and try again.");
+    }
+    if (!response.ok) {
+      const raw = await response.text();
+      let message = "NeuralPath could not start the response. Please try again.";
+      try { message = (JSON.parse(raw) as { message?: string }).message ?? message; } catch { /* safe fallback */ }
+      throw new Error(message);
+    }
+    if (!response.body) throw new Error("Your browser could not read the AI response stream.");
+    const reader = response.body.getReader(), decoder = new TextDecoder();
+    let buffer = "", result: AiChatResponse | null = null;
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const blocks = buffer.split("\n\n"); buffer = blocks.pop() ?? "";
+        for (const block of blocks) {
+          const event = block.split("\n").find(line => line.startsWith("event:"))?.slice(6).trim();
+          const data = block.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("");
+          if (!data) continue;
+          let payload: Record<string, unknown>;
+          try { payload = JSON.parse(data) as Record<string, unknown>; } catch { continue; }
+          if (event === "token" && typeof payload.content === "string") onToken(payload.content);
+          if (event === "done") result = payload as unknown as AiChatResponse;
+          if (event === "error") throw new Error(typeof payload.message === "string" ? payload.message : "NeuralPath could not complete this answer.");
+        }
+      }
+    } finally { reader.releaseLock(); }
+    if (!result) throw new Error("The AI response ended before completion. Please retry.");
+    return result;
+  },
   askAi: (question: string, conversationId?: string) =>
     request<AiChatResponse>("/ai/chat", { method: "POST", body: JSON.stringify({ question, ...(conversationId ? { conversation_id: conversationId } : {}) }) }, 120_000),
 };
