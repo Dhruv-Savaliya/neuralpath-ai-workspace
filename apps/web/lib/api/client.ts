@@ -209,7 +209,7 @@ export const neuralPathApi = {
     request<{ id: string; status: string; completed_at: string | null }>("/progress", { method: "POST", body: JSON.stringify(input) }),
   getKnowledgeSources: () => request<KnowledgeSource[]>("/ai/knowledge"),
   getAiConversations: () => request<AiConversation[]>("/ai/conversations"),
-  getAiConversation: (id: string) => request<{ conversation: AiConversation; messages: Array<{ id: string; role: "user" | "assistant"; content: string; created_at: string }> }>(`/ai/conversations/${id}`),
+  getAiConversation: (id: string) => request<{ conversation: AiConversation; messages: Array<{ id: string; role: "user" | "assistant"; content: string; sources: Array<{ citation: string; title: string; url: string | null; similarity: number }>; created_at: string }> }>(`/ai/conversations/${id}`),
   ingestKnowledge: (input: { title: string; content: string; source_url?: string }) =>
     request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge", { method: "POST", body: JSON.stringify(input) }),
   deleteKnowledge: (sourceId: string) =>
