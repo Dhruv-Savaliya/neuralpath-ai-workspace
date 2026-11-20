@@ -378,9 +378,9 @@ export class AiService {
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const blocks = buffer.split("\n\n"); buffer = blocks.pop() ?? "";
+        const blocks = buffer.split(/\r?\n\r?\n/); buffer = blocks.pop() ?? "";
         for (const block of blocks) {
-          const line = block.split("\n").find(item => item.startsWith("data:"));
+          const line = block.split(/\r?\n/).find(item => item.startsWith("data:"));
           if (!line) continue;
           const data = line.slice(5).trim();
           if (data === "[DONE]") return answer;
@@ -418,9 +418,9 @@ export class AiService {
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const blocks = buffer.split("\n\n"); buffer = blocks.pop() ?? "";
+        const blocks = buffer.split(/\r?\n\r?\n/); buffer = blocks.pop() ?? "";
         for (const block of blocks) {
-          const data = block.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("");
+          const data = block.split(/\r?\n/).filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("");
           if (!data || data === "[DONE]") continue;
           try {
             const payload = JSON.parse(data) as GeminiResponse;
