@@ -26,7 +26,9 @@ async function getAuthRedirectBaseUrl() {
 
 function safeNext(value: FormDataEntryValue | null) {
   const path = typeof value === "string" ? value : "";
-  return path.startsWith("/") && !path.startsWith("//") ? path : "/onboarding";
+  return path.startsWith("/") && !path.startsWith("//") && !path.includes("\\") && !/[\u0000-\u001f]/.test(path)
+    ? path
+    : "/onboarding";
 }
 
 export async function signUp(formData: FormData) {
