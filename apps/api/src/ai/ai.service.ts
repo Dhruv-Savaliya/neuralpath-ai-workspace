@@ -225,13 +225,6 @@ export class AiService {
     ].join("\n");
 
     const generated = await this.generate(req, prompt);
-    const { error: userMessageError } = await req.supabase.from("ai_messages").insert({
-      conversation_id: conversationId,
-      user_id: req.user.id,
-      role: "user",
-      content: question,
-    });
-    if (userMessageError) throw new InternalServerErrorException("Unable to save your question.");
     const candidateSources = sources.map((source, index) => ({
       citation: `S${index + 1}`,
       title: source.source_title,
@@ -239,18 +232,18 @@ export class AiService {
       similarity: Number(source.similarity.toFixed(4)),
     }));
     const validated = validateAnswerCitations(generated.answer, candidateSources);
-    const { error: assistantMessageError } = await req.supabase.from("ai_messages").insert({
-      conversation_id: conversationId,
-      user_id: req.user.id,
-      role: "assistant",
-      content: validated.answer,
+    const { data: savedConversationId, error: saveError } = await req.supabase.rpc("save_ai_exchange", {
+      p_conversation_id: conversationId,
+      p_question: question,
+      p_answer: validated.answer,
     });
-    if (assistantMessageError) this.logger.warn("Tutor answer was generated but message persistence failed.");
-    await req.supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() })
-      .eq("id", conversationId).eq("user_id", req.user.id);
+    if (saveError || !savedConversationId) {
+      this.logger.error(`Tutor exchange persistence failed: ${saveError?.code ?? "missing_conversation_id"}`);
+      throw new InternalServerErrorException("Your answer was generated, but the conversation could not be saved. Please retry.");
+    }
     await this.recordUsage(req, generated.provider, generated.model, "generation", prompt.length, generated.answer.length);
     return {
-      conversation_id: conversationId,
+      conversation_id: savedConversationId,
       answer: validated.answer,
       provider: generated.provider,
       model: generated.model,
