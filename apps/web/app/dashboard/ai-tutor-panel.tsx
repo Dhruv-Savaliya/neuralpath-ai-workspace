@@ -2,19 +2,22 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AlertCircle, BookOpen, Bot, LoaderCircle, MessageCircle, Plus, Send, Trash2, UserRound } from "lucide-react";
-import { neuralPathApi, type AiChatResponse, type KnowledgeSource } from "../../lib/api/client";
+import { neuralPathApi, type AiChatResponse, type AiConversation, type KnowledgeSource } from "../../lib/api/client";
 
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
   result?: AiChatResponse;
+  sources?: AiChatResponse["sources"];
 };
 
 export default function AiTutorPanel() {
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [sourcesLoading, setSourcesLoading] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversations, setConversations] = useState<AiConversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -36,6 +39,24 @@ export default function AiTutorPanel() {
   }, []);
 
   useEffect(() => { void loadSources(); }, [loadSources]);
+
+  const loadConversations = useCallback(async () => {
+    try { setConversations(await neuralPathApi.getAiConversations()); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load tutor history."); }
+  }, []);
+
+  useEffect(() => { void loadConversations(); }, [loadConversations]);
+
+  async function openConversation(id: string) {
+    if (loading) return;
+    if (!id) { setActiveConversationId(null); setMessages([]); setQuestion(""); setError(""); return; }
+    setError("");
+    try {
+      const result = await neuralPathApi.getAiConversation(id);
+      setActiveConversationId(id);
+      setMessages(result.messages.map(message => ({ id: message.id, role: message.role, text: message.content, sources: message.sources ?? [] })));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to open this conversation."); }
+  }
 
   async function addSource(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,7 +95,9 @@ export default function AiTutorPanel() {
     setLoading(true);
     setError("");
     try {
-      const result = await neuralPathApi.askAi(prompt);
+      const result = await neuralPathApi.askAi(prompt, activeConversationId ?? undefined);
+      setActiveConversationId(result.conversation_id);
+      void loadConversations();
       setMessages(previous => [...previous, {
         id: crypto.randomUUID(),
         role: "assistant",
@@ -82,6 +105,7 @@ export default function AiTutorPanel() {
         result,
       }]);
     } catch (cause) {
+      setMessages(previous => previous.filter(message => message.id !== userMessage.id));
       setQuestion(prompt);
       setError(cause instanceof Error ? cause.message : "NeuralPath could not answer right now. Your question is ready to retry.");
     } finally {
@@ -117,6 +141,38 @@ export default function AiTutorPanel() {
       {!neuralPathApi.isConfigured ? (
         <p role="alert" style={{ color: "#f59e0b" }}>The API URL is not configured for this deployment.</p>
       ) : null}
+
+      <div style={{ border: "1px solid var(--border,rgba(148,163,184,.2))", borderRadius: 12, padding: 12, marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <MessageCircle size={16}/>
+            <b style={{ fontSize: 13 }}>Recent conversations</b>
+            <span style={{ color: "var(--muted,#9ca3af)", fontSize: 11 }}>{conversations.length}/30</span>
+          </div>
+          <button type="button" className="text-btn" onClick={() => void openConversation("")} disabled={loading} aria-label="Start a new conversation">
+            <Plus size={14}/> New chat
+          </button>
+        </div>
+        {conversations.length ? (
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
+            {conversations.map(conversation => (
+              <button key={conversation.id} type="button" onClick={() => void openConversation(conversation.id)} disabled={loading}
+                aria-pressed={activeConversationId === conversation.id}
+                style={{
+                  flex: "0 0 auto", minWidth: 150, maxWidth: 230, textAlign: "left", padding: "9px 11px",
+                  borderRadius: 10, border: "1px solid var(--border,rgba(148,163,184,.2))",
+                  background: activeConversationId === conversation.id ? "rgba(99,102,241,.16)" : "transparent",
+                  color: "inherit", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? .65 : 1,
+                }}>
+                <span style={{ display: "block", fontSize: 12, fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{conversation.title}</span>
+                <span style={{ display: "block", marginTop: 4, fontSize: 10, color: "var(--muted,#9ca3af)" }}>{new Date(conversation.updated_at).toLocaleDateString()}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p style={{ margin: 0, color: "var(--muted,#9ca3af)", fontSize: 12 }}>Your saved chats will appear here after your first question.</p>
+        )}
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,340px),1fr))", gap: 18, alignItems: "start" }}>
         <div style={{ display: "grid", gap: 12 }}>
@@ -161,11 +217,11 @@ export default function AiTutorPanel() {
                   {message.result ? <span>· {message.result.provider} / {message.result.model}</span> : null}
                 </div>
                 {message.text}
-                {message.result?.sources.length ? (
+                {(message.result?.sources ?? message.sources ?? []).length ? (
                   <div style={{ borderTop: "1px solid var(--border,rgba(148,163,184,.18))", marginTop: 10, paddingTop: 8 }}>
                     <small style={{ color: "var(--muted,#9ca3af)", display: "block", marginBottom: 5 }}>Retrieved sources</small>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {message.result.sources.map(source => (
+                      {(message.result?.sources ?? message.sources ?? []).map(source => (
                         <a key={source.citation} href={source.url ?? undefined} target={source.url ? "_blank" : undefined} rel={source.url ? "noreferrer" : undefined}
                           style={{ fontSize: 11, padding: "3px 7px", borderRadius: 7, border: "1px solid var(--border,rgba(148,163,184,.2))" }}>
                           [{source.citation}] {source.title}
