@@ -170,16 +170,18 @@ export class AiService {
       if (error || !data) throw new NotFoundException("Tutor conversation was not found.");
     }
 
-    const historyQuery = conversationId
-      ? req.supabase.from("ai_messages")
-          .select("role,content")
-          .eq("conversation_id", conversationId)
-          .eq("user_id", req.user.id)
-          .order("created_at", { ascending: false })
-          .limit(12)
-      : Promise.resolve({ data: [], error: null });
-    const { data: historyRows, error: historyError } = await historyQuery;
-    if (historyError) throw new InternalServerErrorException("Unable to load tutor context.");
+    let historyRows: Array<{ role: string; content: string }> = [];
+    if (conversationId) {
+      const { data, error } = await req.supabase
+        .from("ai_messages")
+        .select("role,content")
+        .eq("conversation_id", conversationId)
+        .eq("user_id", req.user.id)
+        .order("created_at", { ascending: false })
+        .limit(12);
+      if (error) throw new InternalServerErrorException("Unable to load tutor context.");
+      historyRows = data ?? [];
+    }
 
     const [queryEmbedding] = await this.embed(req, [question]);
     const { data, error } = await req.supabase.rpc("match_knowledge_chunks", {
