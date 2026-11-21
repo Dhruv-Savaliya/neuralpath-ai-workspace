@@ -1039,10 +1039,10 @@ export class AiService {
             return (body.items ?? []).filter(x => x.id?.videoId).map(x => ({ title: x.snippet?.title ?? "YouTube video", creator: x.snippet?.channelTitle ?? "YouTube", description: x.snippet?.description ?? "", url: `https://www.youtube.com/watch?v=${x.id!.videoId}`, thumbnail: x.snippet?.thumbnails?.medium?.url ?? null, provider: "YouTube", verified: true }));
           })
         : Promise.resolve([]),
-      fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(topic)}&media=podcast&entity=podcast&limit=6`, { signal: timeout }).then(async r => {
+      fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(topic)}&media=podcast&entity=podcastEpisode&limit=6`, { signal: timeout }).then(async r => {
         if (!r.ok) throw new Error("Podcast search is temporarily unavailable.");
-        const body = await r.json() as { results?: Array<{ collectionName?: string; artistName?: string; collectionViewUrl?: string; artworkUrl100?: string; primaryGenreName?: string }> };
-        return (body.results ?? []).map(x => ({ title: x.collectionName ?? "Podcast", creator: x.artistName ?? "Podcast publisher", description: x.primaryGenreName ?? "Podcast series", url: x.collectionViewUrl ?? "", thumbnail: x.artworkUrl100 ?? null, provider: "Apple Podcasts", verified: true })).filter(x => x.url);
+        const body = await r.json() as { results?: Array<{ trackName?: string; collectionName?: string; artistName?: string; trackViewUrl?: string; episodeUrl?: string; artworkUrl100?: string; primaryGenreName?: string }> };
+        return (body.results ?? []).map(x => ({ title: x.trackName ?? x.collectionName ?? "Podcast episode", creator: x.artistName ?? "Podcast publisher", description: x.collectionName ?? x.primaryGenreName ?? "Podcast episode", url: x.trackViewUrl ?? "", audioUrl: x.episodeUrl ?? null, thumbnail: x.artworkUrl100 ?? null, provider: "Apple Podcasts", verified: true })).filter(x => x.url);
       }),
       fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(topic + " tutorial project")}&sort=stars&order=desc&per_page=6`, { signal: timeout, headers }).then(async r => {
         if (!r.ok) throw new Error("GitHub project search is temporarily unavailable.");
