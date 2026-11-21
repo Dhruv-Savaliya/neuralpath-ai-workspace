@@ -1,14 +1,25 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight, ArrowUpRight, BookOpen, BrainCircuit, Check, Code2,
   Compass, Layers3, Lightbulb, LockKeyhole,
   Palette, Play, Rocket, Sparkles, Target, TrendingUp, WandSparkles,
 } from "lucide-react";
 import { Shell } from "./components/marketing";
+import { HeroArtMotion, HeroCopyMotion, Reveal } from "./components/marketing-motion";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "AI Tutor for Every Subject | NeuralPath",
+  description: "Learn coding, mathematics, science, business, design and more with an AI tutor that explains concepts, adapts to your level and helps you practise.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "NeuralPath — Your AI tutor for every subject",
+    description: "A personal AI tutor and learning workspace for your goals, notes and next steps.",
+    url: "/",
+    type: "website",
+  },
+};
 
 const highlights = [
   { icon: Target, title: "Personal learning paths", copy: "Turn a goal into clear milestones and practical next steps." },
@@ -22,11 +33,6 @@ const areas = [
   { icon: TrendingUp, title: "Business & finance", copy: "Entrepreneurship, strategy, finance and marketing" },
   { icon: Lightbulb, title: "Personal growth", copy: "Communication, leadership, languages and more" },
 ];
-
-function Reveal({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
-  const reduce = useReducedMotion();
-  return <motion.div className={className} initial={false} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: .12 }} transition={{ duration: reduce ? 0 : .55, delay, ease: [.22, 1, .36, 1] }}>{children}</motion.div>;
-}
 
 function NeuralArtwork() {
   return <div className="np-neural-art" aria-label="Abstract glowing neural network illustration" role="img">
@@ -66,19 +72,18 @@ function DashboardPreview() {
 }
 
 export default function Home() {
-  const reduce = useReducedMotion();
   return <Shell>
     <div className="np-home">
       <section className="np-home-hero">
         <div className="np-hero-stars" aria-hidden="true"/>
-        <motion.div className="np-home-hero-copy" initial={false} animate={{opacity:1,y:0}} transition={{duration:reduce?0:.7,ease:[.22,1,.36,1]}}>
+        <HeroCopyMotion className="np-home-hero-copy">
           <span className="np-kicker"><i/> LEARN · BUILD · GROW</span>
           <h1>Your AI tutor<br/>for <em>every subject.</em></h1>
           <p>Learn coding, mathematics, science, business, design and more with an AI tutor that explains concepts, adapts to your level and helps you practise.</p>
           <div className="np-home-actions"><Link className="np-primary-action" href="/auth/sign-up">Try AI Tutor <ArrowUpRight size={17}/></Link><Link className="np-secondary-action" href="/how-it-works"><Play size={14} fill="currentColor"/> Explore learning paths</Link></div>
           <div className="np-hero-assurances"><span><ShieldIcon/> Built around your goals</span><span><LockKeyhole size={14}/> Your progress, your space</span></div>
-        </motion.div>
-        <motion.div className="np-home-hero-art" initial={false} animate={{opacity:1,scale:1}} transition={{duration:reduce?0:.85,delay:.1}}><NeuralArtwork/></motion.div>
+        </HeroCopyMotion>
+        <HeroArtMotion className="np-home-hero-art"><NeuralArtwork/></HeroArtMotion>
         <div className="np-hero-bottomline"><span>ONE SPACE FOR YOUR NEXT CHAPTER</span><span>SCROLL TO EXPLORE ↓</span></div>
       </section>
 
