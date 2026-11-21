@@ -85,7 +85,7 @@ test("streaming does not fall back after the first provider token", async () => 
     calls.push(String(url));
     return new Response(new ReadableStream({
       start(stream) {
-        stream.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"partial"}}]}\\n\\n'));
+        stream.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"partial"}}]}\n\n'));
         stream.error(new Error("provider connection lost"));
       },
     }), { status: 200, headers: { "Content-Type": "text/event-stream" } });
@@ -120,7 +120,7 @@ test("streaming falls back to Gemini when Groq fails before emitting a token", a
       });
     }
     return new Response(
-      'data: {"candidates":[{"content":{"parts":[{"text":"Gemini answer"}]}}]}\\n\\n',
+      'data: {"candidates":[{"content":{"parts":[{"text":"Gemini answer"}]}}]}\n\n',
       { status: 200, headers: { "Content-Type": "text/event-stream" } },
     );
   };
