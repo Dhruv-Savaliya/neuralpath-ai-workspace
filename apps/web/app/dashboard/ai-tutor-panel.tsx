@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, BookOpen, Bot, LoaderCircle, MessageCircle, Plus, Send, Trash2, UserRound } from "lucide-react";
 import { neuralPathApi, type AiChatResponse, type AiConversation, type KnowledgeSource } from "../../lib/api/client";
+import { MarkdownMessage } from "./markdown-message";
 
 type ChatMessage = {
   id: string;
@@ -234,7 +235,7 @@ export default function AiTutorPanel() {
                   <b>{message.role === "user" ? "You" : "NeuralPath"}</b>
                   {message.result ? <span>· {message.result.provider} / {message.result.model}</span> : null}
                 </div>
-                {message.text}
+                {message.role === "assistant" ? <MarkdownMessage content={message.text} /> : message.text}
                 {(message.result?.sources ?? message.sources ?? []).length ? (
                   <div style={{ borderTop: "1px solid var(--border,rgba(148,163,184,.18))", marginTop: 10, paddingTop: 8 }}>
                     <small style={{ color: "var(--muted,#9ca3af)", display: "block", marginBottom: 5 }}>Retrieved sources</small>
