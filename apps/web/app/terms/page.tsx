@@ -4,6 +4,7 @@ import { Shell, Intro } from "../components/marketing";
 export const metadata: Metadata = {
   title: "Terms of Use",
   description: "Read the preliminary NeuralPath terms of use and responsible-use guidance.",
+  alternates: { canonical: "/terms" },
 };
 
 export default function Terms() {
