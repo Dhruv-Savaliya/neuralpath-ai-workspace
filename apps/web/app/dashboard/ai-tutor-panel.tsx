@@ -257,8 +257,11 @@ export default function AiTutorPanel() {
         </form>
         {resourceResults ? <div style={{ display: "grid", gap: 14, marginTop: 14 }}>
           <ResourceGroup title="Videos · YouTube" items={resourceResults.videos} empty="No YouTube results returned. Configure YOUTUBE_API_KEY for ranked results."/>
-          <ResourceGroup title="Audio · Podcasts" items={resourceResults.audio} empty="No matching podcast series were found."/>
+          {resourceResults.notices?.videos ? <p style={{ color: "var(--muted,#9ca3af)", fontSize: 11, margin: "-8px 0 0" }}>{resourceResults.notices.videos}</p> : null}
+          <ResourceGroup title="Audio · Podcasts" items={resourceResults.audio} empty="No matching podcast episodes were found."/>
+          {resourceResults.notices?.audio ? <p style={{ color: "var(--muted,#9ca3af)", fontSize: 11, margin: "-8px 0 0" }}>{resourceResults.notices.audio}</p> : null}
           <ResourceGroup title="Projects · GitHub" items={resourceResults.projects} empty="No matching repositories were found."/>
+          {resourceResults.notices?.projects ? <p style={{ color: "var(--muted,#9ca3af)", fontSize: 11, margin: "-8px 0 0" }}>{resourceResults.notices.projects}</p> : null}
         </div> : null}
       </section>
 
