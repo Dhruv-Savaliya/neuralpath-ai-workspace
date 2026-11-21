@@ -204,7 +204,7 @@ export const neuralPathApi = {
   updateGoal: (id: string, input: Partial<Pick<ApiGoal, "title" | "category" | "desired_outcome" | "current_level" | "target_date" | "status">>) =>
     request<ApiGoal>(`/goals/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
   deleteGoal: (id: string) => request<{ deleted: boolean; id: string }>(`/goals/${id}`, { method: "DELETE" }),
-  bootstrapPath: (goal_id: string) => request<ApiPath>("/paths/bootstrap", { method: "POST", body: JSON.stringify({ goal_id }) }),
+  bootstrapPath: (goal_id: string) => request<ApiPath>("/paths/bootstrap", { method: "POST", body: JSON.stringify({ goal_id }) }, 180_000),
   saveProgress: (input: { path_item_id: string; status: "in_progress" | "completed"; reflection?: string }) =>
     request<{ id: string; status: string; completed_at: string | null }>("/progress", { method: "POST", body: JSON.stringify(input) }),
   getKnowledgeSources: () => request<KnowledgeSource[]>("/ai/knowledge"),
@@ -212,8 +212,84 @@ export const neuralPathApi = {
   getAiConversation: (id: string) => request<{ conversation: AiConversation; messages: Array<{ id: string; role: "user" | "assistant"; content: string; sources: Array<{ citation: string; title: string; url: string | null; similarity: number }>; created_at: string }> }>(`/ai/conversations/${id}`),
   ingestKnowledge: (input: { title: string; content: string; source_url?: string }) =>
     request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge", { method: "POST", body: JSON.stringify(input) }),
+  ingestWebsite: (input: { url: string; title?: string }) =>
+    request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge/website", { method: "POST", body: JSON.stringify(input) }),
   deleteKnowledge: (sourceId: string) =>
     request<{ deleted: boolean; chunks_deleted: number }>(`/ai/knowledge/${sourceId}`, { method: "DELETE" }),
+
+  askAiStream: async (
+    question: string, conversationId: string | undefined, onToken: (token: string) => void, signal?: AbortSignal,
+  ): Promise<AiChatResponse> => {
+    if (!baseUrl) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (error || !token) throw new Error("Your session has expired. Please sign in again.");
+    const timeoutSignal = AbortSignal.timeout(120_000);
+    const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/api/v1/ai/chat/stream`, {
+        method: "POST", cache: "no-store", signal: requestSignal,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, Accept: "text/event-stream" },
+        body: JSON.stringify({ question, ...(conversationId ? { conversation_id: conversationId } : {}) }),
+      });
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === "TimeoutError") throw new Error("This is taking longer than expected. Please try again.");
+      if (cause instanceof DOMException && cause.name === "AbortError") throw new Error("Generation stopped.");
+      throw new Error("We couldn't reach NeuralPath. Check your internet connection and try again.");
+    }
+    if (!response.ok) {
+      const raw = await response.text();
+      let message = "NeuralPath could not start the response. Please try again.";
+      try { message = (JSON.parse(raw) as { message?: string }).message ?? message; } catch { /* safe fallback */ }
+      throw new Error(message);
+    }
+    if (!response.body) throw new Error("Your browser could not read the AI response stream.");
+    const reader = response.body.getReader(), decoder = new TextDecoder();
+    let buffer = "", result: AiChatResponse | null = null;
+    const processBlock = (block: string) => {
+      const lines = block.split(/\r\n|\r|\n/);
+      const event = lines.find(line => line.startsWith("event:"))?.slice(6).trim() ?? "message";
+      const data = lines.filter(line => line.startsWith("data:")).map(line => line.slice(5).replace(/^ /, "")).join("\n");
+      if (!data) return;
+      let payload: Record<string, unknown>;
+      try { payload = JSON.parse(data) as Record<string, unknown>; }
+      catch { throw new Error("NeuralPath sent an invalid stream event. Please retry."); }
+      if (event === "token" && typeof payload.content === "string") onToken(payload.content);
+      if (event === "done") result = payload as unknown as AiChatResponse;
+      if (event === "error") throw new Error(typeof payload.message === "string" ? payload.message : "NeuralPath could not complete this answer.");
+    };
+    const drain = () => {
+      const delimiter = /(?:\r\n\r\n|\r\r|\n\n)/;
+      let match: RegExpExecArray | null;
+      while ((match = delimiter.exec(buffer))) {
+        const block = buffer.slice(0, match.index);
+        buffer = buffer.slice(match.index + match[0].length);
+        processBlock(block);
+      }
+    };
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        drain();
+      }
+      buffer += decoder.decode();
+      drain();
+      if (buffer.trim()) processBlock(buffer);
+    } catch (cause) {
+      if (signal?.aborted || (cause instanceof DOMException && cause.name === "AbortError")) throw new Error("Generation stopped.");
+      if (cause instanceof DOMException && cause.name === "TimeoutError") throw new Error("This is taking longer than expected. Please try again.");
+      throw cause;
+    } finally {
+      if (signal?.aborted) await reader.cancel().catch(() => undefined);
+      reader.releaseLock();
+    }
+    if (!result) throw new Error("The AI response ended before completion. Please retry.");
+    return result;
+  },
   askAi: (question: string, conversationId?: string) =>
     request<AiChatResponse>("/ai/chat", { method: "POST", body: JSON.stringify({ question, ...(conversationId ? { conversation_id: conversationId } : {}) }) }, 120_000),
 };
