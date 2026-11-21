@@ -4,6 +4,7 @@ import { Shell, Intro } from "../components/marketing";
 export const metadata: Metadata = {
   title: "About NeuralPath",
   description: "Learn about NeuralPath's mission to make learning more personal, practical and connected to the goals that matter to you.",
+  alternates: { canonical: "/about" },
 };
 
 export default function About() {
