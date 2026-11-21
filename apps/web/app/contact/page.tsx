@@ -5,6 +5,7 @@ import { Shell, Intro } from "../components/marketing";
 export const metadata: Metadata = {
   title: "Contact NeuralPath",
   description: "Contact the NeuralPath team with questions, ideas or product feedback.",
+  alternates: { canonical: "/contact" },
 };
 
 export default function Contact() {

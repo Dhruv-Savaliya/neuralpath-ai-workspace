@@ -4,6 +4,7 @@ import { Shell, Intro } from "../components/marketing";
 export const metadata: Metadata = {
   title: "Frequently Asked Questions",
   description: "Answers about NeuralPath accounts, learning paths, saved AI tutor conversations, knowledge sources and learner data.",
+  alternates: { canonical: "/faq" },
 };
 
 const qs = [

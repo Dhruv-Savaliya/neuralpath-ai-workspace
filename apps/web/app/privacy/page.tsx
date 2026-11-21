@@ -4,6 +4,7 @@ import { Shell, Intro } from "../components/marketing";
 export const metadata: Metadata = {
   title: "Privacy",
   description: "Read the current draft of NeuralPath's privacy principles and information about learner data.",
+  alternates: { canonical: "/privacy" },
 };
 
 export default function Privacy() {
