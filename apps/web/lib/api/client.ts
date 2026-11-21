@@ -247,9 +247,9 @@ export const neuralPathApi = {
     const reader = response.body.getReader(), decoder = new TextDecoder();
     let buffer = "", result: AiChatResponse | null = null;
     const processBlock = (block: string) => {
-      const lines = block.split(/\\r\\n|\\r|\\n/);
+      const lines = block.split(/\r\n|\r|\n/);
       const event = lines.find(line => line.startsWith("event:"))?.slice(6).trim() ?? "message";
-      const data = lines.filter(line => line.startsWith("data:")).map(line => line.slice(5).replace(/^ /, "")).join("\\n");
+      const data = lines.filter(line => line.startsWith("data:")).map(line => line.slice(5).replace(/^ /, "")).join("\n");
       if (!data) return;
       let payload: Record<string, unknown>;
       try { payload = JSON.parse(data) as Record<string, unknown>; }
