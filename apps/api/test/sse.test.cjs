@@ -88,8 +88,6 @@ test("streaming does not fall back after the first provider token", async () => 
       { status: 200, headers: { "Content-Type": "text/event-stream" } },
     );
   };
-
-  };
   try {
     const service = new AiService(makeConfig({
       GROQ_API_KEY: "groq-test",
