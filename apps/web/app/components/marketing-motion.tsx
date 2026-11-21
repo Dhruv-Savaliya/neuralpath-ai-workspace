@@ -49,3 +49,17 @@ export function HeroArtMotion({ children, className = "" }: { children: ReactNod
     </motion.div>
   );
 }
+
+export function ShellMotion({ children }: { children: ReactNode }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.main
+      className="np-fluid-shell w-full min-w-0"
+      initial={false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduce ? 0 : 0.45, ease: "easeOut" }}
+    >
+      {children}
+    </motion.main>
+  );
+}
