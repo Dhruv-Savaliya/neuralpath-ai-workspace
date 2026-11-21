@@ -1035,7 +1035,7 @@ export class AiService {
       this.config.get<string>("YOUTUBE_API_KEY")
         ? fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&safeSearch=moderate&order=relevance&maxResults=6&q=${encodeURIComponent(topic)}&key=${encodeURIComponent(this.config.get<string>("YOUTUBE_API_KEY")!)}`, { signal: timeout }).then(async r => {
             if (!r.ok) throw new Error("YouTube search is temporarily unavailable.");
-            const body = await r.json() as { items?: Array<{ id?: { videoId?: string }; snippet?: { title?: string; channelTitle?: string; description?: string; thumbnails?: { medium?: { url?: string } } }> };
+            const body = await r.json() as { items?: Array<{ id?: { videoId?: string }; snippet?: { title?: string; channelTitle?: string; description?: string; thumbnails?: { medium?: { url?: string } } } }> };
             return (body.items ?? []).filter(x => x.id?.videoId).map(x => ({ title: x.snippet?.title ?? "YouTube video", creator: x.snippet?.channelTitle ?? "YouTube", description: x.snippet?.description ?? "", url: `https://www.youtube.com/watch?v=${x.id!.videoId}`, thumbnail: x.snippet?.thumbnails?.medium?.url ?? null, provider: "YouTube", verified: true }));
           })
         : Promise.resolve([]),
@@ -1046,7 +1046,7 @@ export class AiService {
       }),
       fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(topic + " tutorial project")}&sort=stars&order=desc&per_page=6`, { signal: timeout, headers }).then(async r => {
         if (!r.ok) throw new Error("GitHub project search is temporarily unavailable.");
-        const body = await r.json() as { items?: Array<{ full_name?: string; description?: string; html_url?: string; stargazers_count?: number; language?: string }> };
+            const body = await r.json() as { items?: Array<{ id?: { videoId?: string }; snippet?: { title?: string; channelTitle?: string; description?: string; thumbnails?: { medium?: { url?: string } } } }> };
         return (body.items ?? []).map(x => ({ title: x.full_name ?? "GitHub project", creator: x.language ?? "Open-source project", description: x.description ?? "Open-source learning project", url: x.html_url ?? "", thumbnail: null, provider: "GitHub", verified: true, stars: x.stargazers_count ?? 0 })).filter(x => x.url);
       }),
     ]);
