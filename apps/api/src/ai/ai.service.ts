@@ -320,6 +320,7 @@ export class AiService {
       title: source.source_title,
       url: source.source_url,
       similarity: Number(source.similarity.toFixed(4)),
+      visibility: (source as { visibility?: string }).visibility || "private",
     }));
     const validated = validateAnswerCitations(generated.answer, candidateSources);
     const { data: savedConversationId, error: saveError } = await req.supabase.rpc("save_ai_exchange", {
@@ -399,6 +400,7 @@ export class AiService {
     const candidates = sources.map((source, i) => ({
       citation: `S${i + 1}`, title: source.source_title, url: source.source_url,
       similarity: Number(source.similarity.toFixed(4)),
+      visibility: (source as { visibility?: string }).visibility || "private",
     }));
     const validated = validateAnswerCitations(generated.answer, candidates);
     const { data: savedId, error: saveError } = await req.supabase.rpc("save_ai_exchange", {

@@ -131,7 +131,7 @@ export type AiChatResponse = {
   answer: string;
   provider: string;
   model: string;
-  sources: Array<{ citation: string; title: string; url: string | null; similarity: number }>;
+  sources: Array<{ citation: string; title: string; url: string | null; similarity: number; visibility?: "private" | "public" | string }>;
 };
 
 async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 25_000): Promise<T> {

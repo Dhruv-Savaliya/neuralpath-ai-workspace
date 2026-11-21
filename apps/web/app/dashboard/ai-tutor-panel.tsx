@@ -321,8 +321,11 @@ export default function AiTutorPanel() {
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {(message.result?.sources ?? message.sources ?? []).map(source => (
                         <a key={source.citation} href={source.url ?? undefined} target={source.url ? "_blank" : undefined} rel={source.url ? "noreferrer" : undefined}
-                          style={{ fontSize: 11, padding: "3px 7px", borderRadius: 7, border: "1px solid var(--border,rgba(148,163,184,.2))" }}>
-                          [{source.citation}] {source.title}
+                          style={{ fontSize: 11, padding: "3px 8px", borderRadius: 7, border: "1px solid var(--border,rgba(148,163,184,.2))", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <span>[{source.citation}] {source.title}</span>
+                          <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 4, background: source.visibility === "public" ? "rgba(103,215,237,0.15)" : "rgba(155,140,255,0.15)", color: source.visibility === "public" ? "var(--cyan,#67d7ed)" : "var(--purple,#9b8cff)" }}>
+                            {source.visibility === "public" ? "NeuralPath library" : "Your notes"}
+                          </span>
                         </a>
                       ))}
                     </div>

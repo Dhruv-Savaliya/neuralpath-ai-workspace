@@ -3,6 +3,7 @@ export type CitationSource = {
   title: string;
   url: string | null;
   similarity: number;
+  visibility?: "private" | "public" | string;
 };
 
 /**
