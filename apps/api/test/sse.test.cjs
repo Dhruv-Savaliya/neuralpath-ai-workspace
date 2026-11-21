@@ -121,6 +121,7 @@ test("streaming falls back to Gemini when Groq fails before emitting a token", a
       'data: {"candidates":[{"content":{"parts":[{"text":"Gemini answer"}]}}]}\n\n',
       { status: 200, headers: { "Content-Type": "text/event-stream" } },
     );
+  };
   try {
     const service = new AiService(makeConfig({
       GROQ_API_KEY: "groq-test",
