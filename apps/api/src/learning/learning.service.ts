@@ -93,17 +93,53 @@ export class LearningService {
   private async loadContext(req: AuthenticatedRequest) {
     const userId = req.user.id;
     const db = req.supabase;
-    const [profileResult, preferencesResult, goalsResult, pathsResult, itemsResult, progressResult] =
+    const now = Date.now();
+    const activitySince = new Date(now - 365 * 86400000).toISOString();
+
+    // Fetch only active goals and the active path first. Historical path rows
+    // are not needed to generate current recommendations or dashboard context.
+    const [profileResult, preferencesResult, goalsResult, activePathResult] =
       await Promise.all([
         db.from("profiles").select("display_name,timezone,experience_level,interests").eq("id", userId).maybeSingle(),
         db.from("learner_preferences").select("learning_formats,learning_pace,weekly_minutes,language_code,preferred_days").eq("user_id", userId).maybeSingle(),
-        db.from("learning_goals").select("id,title,category,status,priority,target_date,weekly_minutes").eq("user_id", userId).order("priority", { ascending: true }),
-        db.from("learning_paths").select("id,title,status,goal_id").eq("user_id", userId).order("created_at", { ascending: false }),
-        db.from("learning_path_items").select("id,path_id,title,description,position,status").eq("user_id", userId).order("position", { ascending: true }),
-        db.from("learning_progress").select("path_item_id,status,completed_at,reflection").eq("user_id", userId),
+        db.from("learning_goals").select("id,title,category,status,priority,target_date,weekly_minutes")
+          .eq("user_id", userId).eq("status", "active").order("priority", { ascending: true }).limit(100),
+        db.from("learning_paths").select("id,title,status,goal_id")
+          .eq("user_id", userId).eq("status", "active")
+          .order("created_at", { ascending: false }).limit(1),
       ]);
 
-    if ([profileResult, preferencesResult, goalsResult, pathsResult, itemsResult, progressResult].some(result => result.error)) {
+    if ([profileResult, preferencesResult, goalsResult, activePathResult].some(result => result.error)) {
+      throw new InternalServerErrorException("Unable to load learner data.");
+    }
+
+    let selectedPath = activePathResult.data?.[0] ?? null;
+    if (!selectedPath) {
+      const fallbackPathResult = await db.from("learning_paths").select("id,title,status,goal_id")
+        .eq("user_id", userId).order("created_at", { ascending: false }).limit(1);
+      if (fallbackPathResult.error) throw new InternalServerErrorException("Unable to load learner data.");
+      selectedPath = fallbackPathResult.data?.[0] ?? null;
+    }
+
+    const itemsResult = selectedPath
+      ? await db.from("learning_path_items").select("id,path_id,title,description,position,status")
+          .eq("user_id", userId).eq("path_id", selectedPath.id)
+          .order("position", { ascending: true }).limit(200)
+      : { data: [], error: null };
+    if (itemsResult.error) throw new InternalServerErrorException("Unable to load learner data.");
+
+    const pathItemIds = (itemsResult.data ?? []).map(item => item.id);
+    const [pathProgressResult, activityResult] = await Promise.all([
+      pathItemIds.length
+        ? db.from("learning_progress").select("path_item_id,status,completed_at,reflection")
+            .eq("user_id", userId).in("path_item_id", pathItemIds).limit(200)
+        : Promise.resolve({ data: [], error: null }),
+      db.from("learning_progress").select("path_item_id,status,completed_at,reflection")
+        .eq("user_id", userId).eq("status", "completed")
+        .gte("completed_at", activitySince)
+        .order("completed_at", { ascending: false }).limit(1000),
+    ]);
+    if (pathProgressResult.error || activityResult.error) {
       throw new InternalServerErrorException("Unable to load learner data.");
     }
 
@@ -115,26 +151,21 @@ export class LearningService {
     }
 
     const goals = goalsResult.data ?? [];
-    const paths = pathsResult.data ?? [];
-    const selectedPath = paths.find(path => path.status === "active") ?? paths[0] ?? null;
-    const progressRows = progressResult.data ?? [];
-    const progressByItem = new Map(progressRows.map(row => [row.path_item_id, row]));
-    const pathItems = selectedPath
-      ? (itemsResult.data ?? []).filter(item => item.path_id === selectedPath.id)
-      : [];
+    const pathItems = (itemsResult.data ?? []) as Array<{ id: string; path_id: string; title: string; description: string; position: number; status: string }>;
+    const progressRows = (activityResult.data ?? []) as Array<{ path_item_id: string; status: string; completed_at: string | null; reflection: string | null }>;
+    const pathProgressRows = (pathProgressResult.data ?? []) as Array<{ path_item_id: string; status: string; completed_at: string | null; reflection: string | null }>;
+    const progressByItem = new Map<string, (typeof pathProgressRows)[number]>(pathProgressRows.map(row => [row.path_item_id, row]));
     const completedItems = pathItems.filter(item =>
       (progressByItem.get(item.id)?.status ?? item.status) === "completed",
     );
     const completedDates = progressRows
-      .filter(row => row.status === "completed" && row.completed_at)
-      .map(row => row.completed_at as string);
-    const activeGoals = goals.filter(goal => goal.status === "active");
-    const now = Date.now();
+      .flatMap(row => row.completed_at ? [row.completed_at] : []);
+    const nowDate = now;
 
     return {
       profile: profileResult.data,
       preferences: preferencesResult.data,
-      goals: activeGoals,
+      goals,
       selectedPath,
       pathItems,
       progressRows,
@@ -142,7 +173,7 @@ export class LearningService {
       completedItems,
       completedDates,
       timeZone,
-      now,
+      now: nowDate,
     };
   }
 
