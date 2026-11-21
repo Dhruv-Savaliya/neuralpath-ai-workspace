@@ -92,17 +92,45 @@ export class PathsService {
       let lastError: unknown;
       for (let attempt = 0; attempt < 2 && !batch; attempt += 1) {
         try {
-          const generated = await this.ai.generateForLearning(req, prompt, { jsonMode: true, preferFallback: attempt === 1, maxOutputTokens: 1800 });
+          const generated = await this.ai.generateForLearning(req, prompt, {
+            jsonMode: true,
+            preferFallback: attempt === 1,
+            maxOutputTokens: attempt === 0 ? 1800 : 2200,
+          });
           batch = this.parseCurriculumBatch(generated.answer, startDay, endDay);
         } catch (error) {
           lastError = error;
-          // Provider outages and rate limits are not malformed JSON. Do not immediately
-          // send a second request to the same exhausted quota window.
-          if (error instanceof ServiceUnavailableException) break;
+          this.logger.warn(`Curriculum batch ${startDay}-${endDay} attempt ${attempt + 1} failed: ${error instanceof Error ? error.message : "unknown error"}`);
+          if (attempt === 0) {
+            // Brief pause before trying fallback provider on attempt 2
+            await new Promise(resolve => setTimeout(resolve, 800));
+          }
         }
       }
       if (!batch) {
         this.logger.warn(`Curriculum batch ${startDay}-${endDay} stopped: ${lastError instanceof Error ? lastError.name : "unknown error"}`);
+        if (days.length > 0) {
+          try {
+            const partialTitle = `${goal.title.trim()} — 45-day learning path`;
+            const partialDesc = `A personalized 45-day learning plan for ${goal.title}, generated from your onboarding profile, preferences, current level and desired outcome.`;
+            const { data: savedPath } = await db.from("learning_paths").insert({
+              user_id: userId, goal_id: goal.id, title: partialTitle,
+              description: partialDesc, status: "in_progress",
+            }).select("*").single();
+
+            if (savedPath) {
+              const partialItems = days.flatMap(day => day.tasks.map((task, index) => ({
+                user_id: userId, path_id: savedPath.id,
+                title: `Day ${day.day}: ${task.title}`,
+                description: `${day.title} — ${day.focus}. ${task.description}`,
+                item_type: task.item_type, position: (day.day - 1) * TASKS_PER_DAY + index, status: "not_started",
+              })));
+              await db.from("learning_path_items").insert(partialItems);
+            }
+          } catch (persistErr) {
+            this.logger.warn(`Failed to persist partial batches: ${persistErr instanceof Error ? persistErr.message : "unknown error"}`);
+          }
+        }
         throw new ServiceUnavailableException({
           code: "CURRICULUM_GENERATION_TEMPORARILY_UNAVAILABLE",
           message: "Your learning plan could not be generated right now because the AI service is busy. Your profile and goals are saved. Please try again shortly.",
@@ -148,11 +176,19 @@ export class PathsService {
     };
   }
 
-  private parseCurriculumBatch(raw: string, startDay: number, endDay: number): GeneratedDay[] {
+  parseCurriculumBatch(raw: string, startDay: number, endDay: number): GeneratedDay[] {
     const cleaned = this.extractJson(raw);
     let value: unknown;
-    try { value = JSON.parse(cleaned); }
-    catch { throw new BadRequestException("The AI provider returned incomplete or invalid curriculum JSON."); }
+    try {
+      value = JSON.parse(cleaned);
+    } catch {
+      try {
+        const repaired = this.repairJson(cleaned);
+        value = JSON.parse(repaired);
+      } catch {
+        throw new BadRequestException("The AI provider returned incomplete or invalid curriculum JSON.");
+      }
+    }
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       throw new BadRequestException("The AI provider returned an invalid curriculum batch.");
     }
@@ -186,8 +222,25 @@ export class PathsService {
     return days as GeneratedDay[];
   }
 
+  private repairJson(jsonStr: string): string {
+    let repaired = jsonStr.trim();
+    repaired = repaired.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    repaired = repaired.replace(/,\s*([}\]])/g, "$1");
+    const openBraces = (repaired.match(/\{/g) || []).length;
+    const closeBraces = (repaired.match(/\}/g) || []).length;
+    const openBrackets = (repaired.match(/\[/g) || []).length;
+    const closeBrackets = (repaired.match(/\]/g) || []).length;
+    if (openBrackets > closeBrackets) {
+      repaired += "]".repeat(openBrackets - closeBrackets);
+    }
+    if (openBraces > closeBraces) {
+      repaired += "}".repeat(openBraces - closeBraces);
+    }
+    return repaired;
+  }
+
   private extractJson(raw: string): string {
-    const text = raw.trim().replace(/^\uFEFF/, "").replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+    const text = raw.trim().replace(/^\uFEFF/, "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
     const start = text.indexOf("{");
     if (start < 0) return text;
     let depth = 0;

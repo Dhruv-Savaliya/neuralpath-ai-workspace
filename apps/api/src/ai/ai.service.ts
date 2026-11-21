@@ -874,9 +874,9 @@ export class AiService {
   private async generateWithGemini(apiKey: string, model: string, prompt: string, jsonMode = false, maxOutputTokens = 4096): Promise<string> {
     let response: Response | undefined;
     let lastNetworkError: unknown;
-    // A transient DNS/socket/edge timeout should not immediately exhaust the
-    // only fallback provider. Retry once, while keeping the retry bounded.
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    // Bounded exponential backoff with jitter handles high-demand 503s and transient network timeouts.
+    const maxAttempts = 3;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       try {
         response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
@@ -896,20 +896,26 @@ export class AiService {
             signal: AbortSignal.timeout(30000),
           },
         );
-        if (attempt === 0 && [408, 500, 502, 503, 504].includes(response.status)) {
-          await new Promise(resolve => setTimeout(resolve, 1200));
+        if (attempt < maxAttempts - 1 && [408, 429, 500, 502, 503, 504].includes(response.status)) {
+          const jitter = Math.floor(Math.random() * 400);
+          const backoffMs = Math.min(4000, 1000 * Math.pow(2, attempt) + jitter);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
           response = undefined;
           continue;
         }
         break;
       } catch (error) {
         lastNetworkError = error;
-        if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 1200));
+        if (attempt < maxAttempts - 1) {
+          const jitter = Math.floor(Math.random() * 400);
+          const backoffMs = Math.min(4000, 1000 * Math.pow(2, attempt) + jitter);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        }
       }
     }
     if (!response) {
       const reason = lastNetworkError instanceof Error ? lastNetworkError.name : "unknown network error";
-      throw new ProviderError(`Gemini network request failed after one retry (${reason}).`, 503);
+      throw new ProviderError(`Gemini network request failed after retries (${reason}).`, 503);
     }
     const payload = (await response.json().catch(() => ({}))) as GeminiResponse;
     if (!response.ok) throw new ProviderError(
@@ -965,6 +971,15 @@ export class AiService {
           await new Promise(resolve => setTimeout(resolve, Math.ceil(retryAfterMs) + 250));
           continue;
         }
+      }
+      if (response.status === 400) {
+        const providerMessage = payload.error?.message ?? "Groq request failed.";
+        const failedGen = (payload.error as any)?.failed_generation;
+        if (typeof failedGen === "string" && failedGen.trim()) {
+          this.logger.warn("Groq returned HTTP 400 with failed_generation; attempting tolerant recovery.");
+          return failedGen.trim();
+        }
+        throw new ProviderError(providerMessage, 400);
       }
       if (!response.ok) throw new ProviderError(
         payload.error?.message ?? "Groq request failed.",
