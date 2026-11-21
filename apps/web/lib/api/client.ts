@@ -2,7 +2,7 @@
 
 import { createClient } from "../supabase/client";
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
+const baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? (typeof window !== "undefined" ? "" : "")).replace(/\/$/, "");
 
 export type ApiPathItem = {
   id: string;
@@ -135,7 +135,7 @@ export type AiChatResponse = {
 };
 
 async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 25_000): Promise<T> {
-  if (!baseUrl) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
+  if (baseUrl === undefined) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
   const supabase = createClient();
   const { data, error } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -215,7 +215,7 @@ export const neuralPathApi = {
   ingestWebsite: (input: { url: string; title?: string }) =>
     request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge/website", { method: "POST", body: JSON.stringify(input) }),
   ingestDocument: async (file: File, title?: string) => {
-    if (!baseUrl) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
+    if (baseUrl === undefined) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
     const supabase = createClient();
     const { data, error } = await supabase.auth.getSession();
     const token = data.session?.access_token;
@@ -243,7 +243,7 @@ export const neuralPathApi = {
   askAiStream: async (
     question: string, conversationId: string | undefined, onToken: (token: string) => void, signal?: AbortSignal,
   ): Promise<AiChatResponse> => {
-    if (!baseUrl) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
+    if (baseUrl === undefined) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
     const supabase = createClient();
     const { data, error } = await supabase.auth.getSession();
     const token = data.session?.access_token;
