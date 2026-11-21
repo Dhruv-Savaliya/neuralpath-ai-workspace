@@ -18,6 +18,13 @@ import type { AcceptRecommendationDto } from "./dto/accept-recommendation.dto";
 
 const PHASE_LENGTH_DAYS = 7;
 
+/**
+ * Activity window in days used for recommendation and context generation.
+ * Full history is preserved for analytics; this focused window is loaded
+ * for AI context to keep recommendations relevant and prompt sizes bounded.
+ */
+export const DEFAULT_ACTIVITY_WINDOW_DAYS = 60;
+
 function topicForDay(items: Array<{ title: string; description: string }>, day: number): string {
   const item = items.find(candidate => {
     const titleDay = Number(candidate.title.match(/^Day\s+(\d+)/i)?.[1]);
@@ -90,11 +97,11 @@ function weeklyActivity(values: string[], timeZone: string, now: number) {
 export class LearningService {
   constructor(private readonly ai: AiService) {}
 
-  private async loadContext(req: AuthenticatedRequest) {
+  private async loadContext(req: AuthenticatedRequest, windowDays = DEFAULT_ACTIVITY_WINDOW_DAYS) {
     const userId = req.user.id;
     const db = req.supabase;
     const now = Date.now();
-    const activitySince = new Date(now - 365 * 86400000).toISOString();
+    const activitySince = new Date(now - windowDays * 86400000).toISOString();
 
     // Fetch only active goals and the active path first. Historical path rows
     // are not needed to generate current recommendations or dashboard context.

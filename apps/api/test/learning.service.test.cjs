@@ -167,3 +167,22 @@ test("loadContext bounds learner analytics to active goals, one path and recent 
   assert.ok(db.calls.some(call => call.table === "learning_progress" && call.method === "gte" && call.column === "completed_at"));
   assert.ok(db.calls.some(call => call.table === "learning_progress" && call.method === "limit" && call.value === 1000));
 });
+
+
+test("activity window boundary uses 60-day window for recommendation context", async () => {
+  const db = makeDb(contextData());
+  const ai = { generateForLearning: async () => ({ text: "{}" }) };
+  const service = new LearningService(ai);
+  await service.getInsights(learnerRequest(db));
+
+  const gteCall = db.calls.find(c => c.table === "learning_progress" && c.method === "gte" && c.column === "completed_at");
+  assert.ok(gteCall, "learning_progress should be filtered by completed_at gte");
+  
+  const activityDate = new Date(gteCall.value).getTime();
+  const now = Date.now();
+  const daysDiff = (now - activityDate) / 86400000;
+  
+  // Must be approximately 60 days (between 59 and 61 days), NOT 365 days
+  assert.ok(daysDiff >= 59 && daysDiff <= 61, `Expected ~60 day window, got ${daysDiff} days`);
+  assert.ok(daysDiff < 100, "Window should be less than 100 days");
+});
