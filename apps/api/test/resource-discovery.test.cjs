@@ -8,8 +8,8 @@ test("resource discovery returns podcast and GitHub results plus a safe YouTube 
   global.fetch = async (url) => {
     const target = String(url);
     if (target.includes("itunes.apple.com")) return new Response(JSON.stringify({ results: [{
-      collectionName: "Learn Python Podcast", artistName: "Example Creator",
-      collectionViewUrl: "https://podcasts.apple.com/podcast/example", artworkUrl100: "https://example.com/art.png",
+      trackName: "Python Episode 1", collectionName: "Learn Python Podcast", artistName: "Example Creator",
+      trackViewUrl: "https://podcasts.apple.com/podcast/example/episode/1", episodeUrl: "https://cdn.example.com/python-episode.mp3", artworkUrl100: "https://example.com/art.png",
       primaryGenreName: "Education",
     }] }), { status: 200, headers: { "Content-Type": "application/json" } });
     if (target.includes("api.github.com/search/repositories")) return new Response(JSON.stringify({ items: [{
@@ -24,7 +24,8 @@ test("resource discovery returns podcast and GitHub results plus a safe YouTube 
     assert.equal(result.videos[0].provider, "YouTube");
     assert.equal(result.videos[0].verified, false);
     assert.match(result.videos[0].url, /youtube\.com\/results/);
-    assert.equal(result.audio[0].title, "Learn Python Podcast");
+    assert.equal(result.audio[0].title, "Python Episode 1");
+    assert.equal(result.audio[0].audioUrl, "https://cdn.example.com/python-episode.mp3");
     assert.equal(result.projects[0].title, "example/python-project");
     assert.equal(result.projects[0].stars, 1200);
     assert.equal(result.availability.videos, "search_link");
