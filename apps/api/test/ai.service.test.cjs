@@ -176,11 +176,11 @@ test("Gemini fallback is used when Groq truncates a curriculum response", async 
     calls.push(String(url));
     if (String(url).includes("api.groq.com")) {
       return new Response(JSON.stringify({
-        choices: [{ message: { content: "{\\"days\\":[" }, finish_reason: "length" }],
+        choices: [{ message: { content: '{"days":[' }, finish_reason: "length" }],
       }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify({
-      candidates: [{ content: { parts: [{ text: "{\\"days\\":[]}" }] }, finishReason: "STOP" }],
+      candidates: [{ content: { parts: [{ text: '{"days":[]}' }] }, finishReason: "STOP" }],
     }), { status: 200, headers: { "Content-Type": "application/json" } });
   };
   try {
@@ -219,7 +219,7 @@ test("Gemini retries a transient 503 before returning a curriculum response", as
       });
     }
     return new Response(JSON.stringify({
-      candidates: [{ content: { parts: [{ text: "{\\"days\\":[]}" }] }, finishReason: "STOP" }],
+      candidates: [{ content: { parts: [{ text: '{"days":[]}' }] }, finishReason: "STOP" }],
     }), { status: 200, headers: { "Content-Type": "application/json" } });
   };
   try {
