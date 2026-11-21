@@ -144,6 +144,7 @@ export type LearningResourceResults = {
   audio: LearningResource[];
   projects: LearningResource[];
   availability: { videos: "live" | "search_link" | "unavailable"; audio: "live" | "unavailable"; projects: "live" | "unavailable" };
+  notices?: { videos: string | null; audio: string | null; projects: string | null };
 };
 
 export type AiChatResponse = {
