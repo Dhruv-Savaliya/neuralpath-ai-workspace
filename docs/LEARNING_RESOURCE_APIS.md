@@ -6,7 +6,7 @@ NeuralPath's resource discovery uses public/free API access where available. No 
 
 | Provider | Secret needed? | What NeuralPath displays | Limits / caveats |
 | --- | --- | --- | --- |
-| YouTube Data API v3 | Optional API key | Up to 6 embeddable video search results, titles, channels and thumbnails | Google quota applies. The search endpoint has a daily quota bucket; monitor it in Google Cloud Console. |
+| YouTube Data API v3 | Optional API key | Up to 6 embeddable video search results, titles, channels and thumbnails | Google quota applies: the current search.list allowance is 100 calls/day by default. Monitor the project quota in Google Cloud Console; Google can change allocations. |
 | Apple iTunes Search API | No | Podcast episode listings and publisher links; a native audio player only when the catalog supplies a direct episode audio URL | Apple catalog metadata does not guarantee a playable audio URL for every episode. |
 | GitHub Search API | No for public repositories | Public repositories sorted by star count | Unauthenticated search is limited to 10 requests/minute; GitHub can also apply secondary limits. Stars are not a quality or safety guarantee. |
 
