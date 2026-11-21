@@ -51,7 +51,7 @@ export default function WorkspaceGoalsPanel() {
     finally{setSaving(false);}
   }
   async function createPath(goal:ApiGoal){
-    setSaving(true);setError("");setNotice("");
+    setSaving(true);setError("");setNotice("Generating your personalized 45-day roadmap. This can take a little while; keep this page open.");
     try{await neuralPathApi.bootstrapPath(goal.id);setRetryGoalId(null);setNotice("Your 45-day learning path is ready.");await load();}
     catch(cause){setRetryGoalId(goal.id);setError(cause instanceof Error?cause.message:"Unable to create the learning path.");}
     finally{setSaving(false);}
