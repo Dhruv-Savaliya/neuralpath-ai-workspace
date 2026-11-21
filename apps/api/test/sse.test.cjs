@@ -83,10 +83,15 @@ test("streaming does not fall back after the first provider token", async () => 
   const tokens = [];
   global.fetch = async url => {
     calls.push(String(url));
+    let sent = false;
     return new Response(new ReadableStream({
-      start(stream) {
-        stream.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"partial"}}]}\n\n'));
-        stream.error(new Error("provider connection lost"));
+      pull(stream) {
+        if (!sent) {
+          sent = true;
+          stream.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"partial"}}]}\\n\\n'));
+        } else {
+          stream.error(new Error("provider connection lost"));
+        }
       },
     }), { status: 200, headers: { "Content-Type": "text/event-stream" } });
   };
