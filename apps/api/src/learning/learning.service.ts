@@ -151,9 +151,10 @@ export class LearningService {
     }
 
     const goals = goalsResult.data ?? [];
-    const pathItems = itemsResult.data ?? [];
-    const progressRows = activityResult.data ?? [];
-    const progressByItem = new Map((pathProgressResult.data ?? []).map(row => [row.path_item_id, row]));
+    const pathItems = (itemsResult.data ?? []) as Array<{ id: string; path_id: string; title: string; description: string; position: number; status: string }>;
+    const progressRows = (activityResult.data ?? []) as Array<{ path_item_id: string; status: string; completed_at: string | null; reflection: string | null }>;
+    const pathProgressRows = (pathProgressResult.data ?? []) as Array<{ path_item_id: string; status: string; completed_at: string | null; reflection: string | null }>;
+    const progressByItem = new Map<string, (typeof pathProgressRows)[number]>(pathProgressRows.map(row => [row.path_item_id, row]));
     const completedItems = pathItems.filter(item =>
       (progressByItem.get(item.id)?.status ?? item.status) === "completed",
     );
