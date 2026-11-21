@@ -78,10 +78,10 @@ export const MarkdownMessage = memo(function MarkdownMessage({ content }: { cont
         rehypePlugins={[rehypeKatex]}
         components={{
           code: CodeBlock,
-          a: ({ node, ...props }) => (
+          a: ({ ...props }) => (
             <a {...props} target="_blank" rel="noopener noreferrer" className="np-md-link" />
           ),
-          table: ({ node, ...props }) => (
+          table: ({ ...props }) => (
             <div className="np-table-container">
               <table className="np-table" {...props} />
             </div>

@@ -259,9 +259,9 @@ export const neuralPathApi = {
       if (event === "token" && typeof payload.content === "string") onToken(payload.content);
       if (event === "done") result = payload as unknown as AiChatResponse;
       if (event === "error") {
-        const err = new Error(typeof payload.message === "string" ? payload.message : "NeuralPath could not complete this answer.");
-        (err as any).code = payload.code ?? "STREAM_INTERRUPTED";
-        (err as any).retryable = payload.retryable ?? true;
+        const err = new Error(typeof payload.message === "string" ? payload.message : "NeuralPath could not complete this answer.") as Error & { code?: unknown; retryable?: boolean };
+        err.code = payload.code ?? "STREAM_INTERRUPTED";
+        err.retryable = payload.retryable !== false;
         throw err;
       }
     };
