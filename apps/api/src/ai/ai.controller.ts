@@ -6,6 +6,7 @@ import { SupabaseAuthGuard } from "../auth/supabase-auth.guard";
 import { AiService } from "./ai.service";
 import { ChatDto } from "./dto/chat.dto";
 import { IngestKnowledgeDto } from "./dto/ingest-knowledge.dto";
+import { IngestWebsiteDto } from "./dto/ingest-website.dto";
 
 @Controller("ai")
 @UseGuards(SupabaseAuthGuard)
@@ -17,6 +18,12 @@ export class AiController {
   @Get("knowledge")
   listKnowledge(@Req() req: AuthenticatedRequest) {
     return this.ai.listKnowledge(req);
+  }
+
+  @Post("knowledge/website")
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  ingestWebsite(@Req() req: AuthenticatedRequest, @Body() dto: IngestWebsiteDto) {
+    return this.ai.ingestWebsite(req, dto);
   }
 
   @Post("knowledge")

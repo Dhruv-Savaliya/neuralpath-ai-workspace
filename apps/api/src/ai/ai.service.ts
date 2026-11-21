@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  BadGatewayException,
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
@@ -11,6 +12,8 @@ import { ConfigService } from "@nestjs/config";
 import type { AuthenticatedRequest } from "../common/authenticated-request";
 import type { ChatDto } from "./dto/chat.dto";
 import type { IngestKnowledgeDto } from "./dto/ingest-knowledge.dto";
+import type { IngestWebsiteDto } from "./dto/ingest-website.dto";
+import { fetchPublicWebpage } from "./website-ingestion";
 import { validateAnswerCitations } from "./citations";
 
 type EmbeddingResponse = {
@@ -84,6 +87,26 @@ export class AiService {
       embedding_model: this.model,
       dimensions: this.dimensions,
     };
+  }
+
+
+  async ingestWebsite(req: AuthenticatedRequest, dto: IngestWebsiteDto) {
+    let page: { title: string; content: string; url: string };
+    try {
+      page = await fetchPublicWebpage(dto.url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to import this webpage.";
+      if (/valid|Only public|does not resolve|not supported|enough readable|redirected too many|larger than/i.test(message)) {
+        throw new BadRequestException(message);
+      }
+      this.logger.warn("Knowledge webpage import failed before indexing.");
+      throw new BadGatewayException("We couldn't fetch this webpage. Check that it is publicly accessible and try again.");
+    }
+    return this.ingest(req, {
+      title: dto.title?.trim() || page.title,
+      content: page.content,
+      source_url: page.url,
+    });
   }
 
   async listKnowledge(req: AuthenticatedRequest) {
