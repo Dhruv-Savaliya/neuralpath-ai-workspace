@@ -36,54 +36,49 @@ set search_path = pg_catalog, extensions, public
 set hnsw.ef_search = 100
 as $$
   with vector_candidates as (
-    select kc.id
+    select
+      kc.id,
+      row_number() over (
+        order by kc.embedding OPERATOR(extensions.<=>) query_embedding
+      ) as rank_ix
     from public.knowledge_chunks as kc
     where kc.user_id = (select auth.uid())
+      and 1 - (kc.embedding OPERATOR(extensions.<=>) query_embedding) > match_threshold
     order by kc.embedding OPERATOR(extensions.<=>) query_embedding
-    limit least(greatest(match_count, 1) * 4, 40)
+    limit least(greatest(match_count, 1), 30) * 2
   ),
   text_candidates as (
-    select kc.id
+    select
+      kc.id,
+      row_number() over (
+        order by ts_rank_cd(kc.search_vector, websearch_to_tsquery('simple', query_text)) desc
+      ) as rank_ix
     from public.knowledge_chunks as kc
     where kc.user_id = (select auth.uid())
       and nullif(trim(query_text), '') is not null
       and kc.search_vector @@ websearch_to_tsquery('simple', query_text)
-    order by ts_rank_cd(kc.search_vector, websearch_to_tsquery('simple', query_text)) desc
-    limit least(greatest(match_count, 1) * 4, 40)
+    order by rank_ix
+    limit least(greatest(match_count, 1), 30) * 2
   ),
-  candidate_ids as (
-    select id from vector_candidates
-    union
-    select id from text_candidates
-  ),
-  scored as (
+  fused as (
     select
-      kc.id,
-      kc.source_title,
-      kc.source_url,
-      kc.content,
-      (1 - (kc.embedding OPERATOR(extensions.<=>) query_embedding))::real as similarity,
-      case
-        when nullif(trim(query_text), '') is not null
-          then ts_rank_cd(kc.search_vector, websearch_to_tsquery('simple', query_text))::real
-        else 0::real
-      end as text_rank
-    from public.knowledge_chunks as kc
-    join candidate_ids as candidate on candidate.id = kc.id
-    where kc.user_id = (select auth.uid())
-      and (
-        1 - (kc.embedding OPERATOR(extensions.<=>) query_embedding) > match_threshold
-        or (
-          nullif(trim(query_text), '') is not null
-          and kc.search_vector @@ websearch_to_tsquery('simple', query_text)
-        )
-      )
+      coalesce(text_candidates.id, vector_candidates.id) as id,
+      coalesce(1.0 / (60 + text_candidates.rank_ix), 0.0)
+        + coalesce(1.0 / (60 + vector_candidates.rank_ix), 0.0) as rrf_score
+    from text_candidates
+    full outer join vector_candidates
+      on text_candidates.id = vector_candidates.id
   )
-  select id, source_title, source_url, content, similarity
-  from scored
-  order by
-    (0.75 * greatest(similarity, 0) + 0.25 * least(text_rank, 1)) desc,
-    similarity desc
+  select
+    kc.id,
+    kc.source_title,
+    kc.source_url,
+    kc.content,
+    (1 - (kc.embedding OPERATOR(extensions.<=>) query_embedding))::real as similarity
+  from fused
+  join public.knowledge_chunks as kc on kc.id = fused.id
+  where kc.user_id = (select auth.uid())
+  order by fused.rrf_score desc
   limit least(greatest(match_count, 1), 10);
 $$;
 
