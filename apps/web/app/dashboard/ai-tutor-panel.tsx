@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, BookOpen, Bot, ExternalLink, LoaderCircle, MessageCircle, Plus, Search, Send, Trash2, UserRound } from "lucide-react";
-import { neuralPathApi, type AiChatResponse, type AiConversation, type KnowledgeSource } from "../../lib/api/client";
+import { neuralPathApi, type AiChatResponse, type AiConversation, type KnowledgeSource, type LearningResourceResults } from "../../lib/api/client";
 import { MarkdownMessage } from "./markdown-message";
 
 type ChatMessage = {
