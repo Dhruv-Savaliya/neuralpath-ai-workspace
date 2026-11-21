@@ -4,6 +4,7 @@ import { Shell, Intro } from "../components/marketing";
 export const metadata: Metadata = {
   title: "How NeuralPath Works",
   description: "See how NeuralPath turns your learning goals, experience and available time into a practical learning journey.",
+  alternates: { canonical: "/how-it-works" },
 };
 
 const steps = [["01","Tell us where you want to go","Share what you want to learn, why it matters, what you already know, and how much time you have."],["02","Shape your learning profile","Review your goals, current level, preferred formats, and schedule. You can change these details whenever you need."],["03","Build your path","Get a structured learning journey with topics, practice, projects, and milestones matched to your direction."],["04","Learn, reflect, and adapt","Track your progress and use learning support to decide what to focus on next. Your journey can evolve with you."]];
