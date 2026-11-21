@@ -4,6 +4,7 @@ import { Shell, Intro } from "../components/marketing";
 export const metadata: Metadata = {
   title: "Learning Features",
   description: "Explore NeuralPath learning paths, AI learning support, practical projects, progress tracking and a personal resource library.",
+  alternates: { canonical: "/features" },
 };
 
 const items = [["⌁","Personal learning paths","A journey shaped around your goals, experience, available time, and preferred ways to learn."],["✧","AI learning companion","Get explanations, ideas, and next-step guidance with AI designed to support—not replace—your effort."],["◇","Practical projects","Turn concepts into useful work through exercises and projects connected to what you want to achieve."],["◷","Progress that makes sense","See completed work, milestones, consistency, and the skills you are developing."],["▤","A growing resource library","Keep relevant learning material organized around your goals and topics."],["✳","A flexible learning profile","Update your interests, goals, and schedule as your direction changes."]];
