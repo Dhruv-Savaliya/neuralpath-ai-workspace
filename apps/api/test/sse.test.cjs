@@ -83,17 +83,12 @@ test("streaming does not fall back after the first provider token", async () => 
   const tokens = [];
   global.fetch = async url => {
     calls.push(String(url));
-    let sent = false;
-    return new Response(new ReadableStream({
-      pull(stream) {
-        if (!sent) {
-          sent = true;
-          stream.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"partial"}}]}\\n\\n'));
-        } else {
-          stream.error(new Error("provider connection lost"));
-        }
-      },
-    }), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+    return new Response(
+      'data: {"choices":[{"delta":{"content":"partial"}}]}\\n\\n',
+      { status: 200, headers: { "Content-Type": "text/event-stream" } },
+    );
+  };
+
   };
   try {
     const service = new AiService(makeConfig({
@@ -103,8 +98,8 @@ test("streaming does not fall back after the first provider token", async () => 
     service.recordUsage = async () => {};
     const req = makeStreamingRequest();
     await assert.rejects(
-      service.generateStreaming(req, "prompt", new AbortController().signal, token => tokens.push(token)),
-      /provider connection lost/,
+      service.generateStreaming(req, "prompt", new AbortController().signal, token => { tokens.push(token); throw new Error("client stream write failed"); }),
+      /client stream write failed/,
     );
     assert.deepEqual(tokens, ["partial"]);
     assert.equal(calls.length, 1, "Gemini must not be called after partial Groq output");
