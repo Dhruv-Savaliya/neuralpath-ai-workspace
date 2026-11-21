@@ -3,8 +3,14 @@ import { Shell, Intro } from "../components/marketing";
 
 export const metadata: Metadata = {
   title: "About NeuralPath",
-  description: "Learn about NeuralPath's mission to make learning more personal, practical and connected to the goals that matter to you.",
+  description: "Learn about the NeuralPath mission to empower lifelong learners and professionals with adaptive study roadmaps, practical projects, and AI support.",
   alternates: { canonical: "/about" },
+  openGraph: {
+    title: "About NeuralPath | NeuralPath",
+    description: "Learn about the NeuralPath mission to empower lifelong learners and professionals with adaptive study roadmaps, practical projects, and AI support.",
+    url: "/about",
+    type: "website",
+  },
 };
 
 export default function About() {

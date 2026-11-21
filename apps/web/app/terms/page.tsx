@@ -2,9 +2,15 @@ import type { Metadata } from "next";
 import { Shell, Intro } from "../components/marketing";
 
 export const metadata: Metadata = {
-  title: "Terms of Use",
-  description: "Read the preliminary NeuralPath terms of use and responsible-use guidance.",
+  title: "Terms of Service",
+  description: "Review the NeuralPath terms of service, platform usage guidelines, acceptable use policies, and information regarding AI-assisted learning assistance.",
   alternates: { canonical: "/terms" },
+  openGraph: {
+    title: "Terms of Service | NeuralPath",
+    description: "Review the NeuralPath terms of service, platform usage guidelines, acceptable use policies, and information regarding AI-assisted learning assistance.",
+    url: "/terms",
+    type: "website",
+  },
 };
 
 export default function Terms() {

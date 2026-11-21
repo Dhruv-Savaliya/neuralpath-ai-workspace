@@ -2,9 +2,15 @@ import type { Metadata } from "next";
 import { Shell, Intro } from "../components/marketing";
 
 export const metadata: Metadata = {
-  title: "Privacy",
-  description: "Read the current draft of NeuralPath's privacy principles and information about learner data.",
+  title: "Privacy Policy",
+  description: "Read how NeuralPath protects your personal information, account credentials, study activity, and private learning materials with secure data practices.",
   alternates: { canonical: "/privacy" },
+  openGraph: {
+    title: "Privacy Policy | NeuralPath",
+    description: "Read how NeuralPath protects your personal information, account credentials, study activity, and private learning materials with secure data practices.",
+    url: "/privacy",
+    type: "website",
+  },
 };
 
 export default function Privacy() {
