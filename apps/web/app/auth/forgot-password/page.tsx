@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requestPasswordReset } from "../../actions/auth";
+
+export const metadata: Metadata = {
+  title: "Reset your password",
+  description: "Request a secure password recovery link for your NeuralPath account.",
+  robots: { index: false, follow: false },
+};
 
 export default async function ForgotPassword({ searchParams }: { searchParams: Promise<{ error?: string; sent?: string }> }) {
   const { error, sent } = await searchParams;
