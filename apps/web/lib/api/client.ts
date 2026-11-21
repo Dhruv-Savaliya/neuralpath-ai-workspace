@@ -204,7 +204,7 @@ export const neuralPathApi = {
   updateGoal: (id: string, input: Partial<Pick<ApiGoal, "title" | "category" | "desired_outcome" | "current_level" | "target_date" | "status">>) =>
     request<ApiGoal>(`/goals/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
   deleteGoal: (id: string) => request<{ deleted: boolean; id: string }>(`/goals/${id}`, { method: "DELETE" }),
-  bootstrapPath: (goal_id: string) => request<ApiPath>("/paths/bootstrap", { method: "POST", body: JSON.stringify({ goal_id }) }),
+  bootstrapPath: (goal_id: string) => request<ApiPath>("/paths/bootstrap", { method: "POST", body: JSON.stringify({ goal_id }) }, 180_000),
   saveProgress: (input: { path_item_id: string; status: "in_progress" | "completed"; reflection?: string }) =>
     request<{ id: string; status: string; completed_at: string | null }>("/progress", { method: "POST", body: JSON.stringify(input) }),
   getKnowledgeSources: () => request<KnowledgeSource[]>("/ai/knowledge"),
