@@ -163,7 +163,7 @@ export class AiService {
     return this.ingest(req, {
       title: documentTitle,
       content: cleanedText,
-      source_url: null,
+      source_url: undefined,
     });
   }
 
