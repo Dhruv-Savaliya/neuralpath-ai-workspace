@@ -1025,4 +1025,49 @@ export class AiService {
       // Telemetry failures must never make a successful AI response fail.
     }
   }
+
+  async discoverLearningResources(topicInput: string) {
+    const topic = topicInput.trim().slice(0, 160);
+    if (topic.length < 2) throw new BadRequestException("Enter a learning topic with at least 2 characters.");
+    const timeout = AbortSignal.timeout(9000);
+    const headers = { "User-Agent": "NeuralPath-Learning-Resource-Discovery/1.0", Accept: "application/vnd.github+json" };
+    const [videos, podcasts, projects] = await Promise.allSettled([
+      this.config.get<string>("YOUTUBE_API_KEY")
+        ? fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&safeSearch=moderate&order=relevance&maxResults=6&q=${encodeURIComponent(topic)}&key=${encodeURIComponent(this.config.get<string>("YOUTUBE_API_KEY")!)}`, { signal: timeout }).then(async r => {
+            if (!r.ok) throw new Error("YouTube search is temporarily unavailable.");
+            const body = await r.json() as { items?: Array<{ id?: { videoId?: string }; snippet?: { title?: string; channelTitle?: string; description?: string; thumbnails?: { medium?: { url?: string } } }> };
+            return (body.items ?? []).filter(x => x.id?.videoId).map(x => ({ title: x.snippet?.title ?? "YouTube video", creator: x.snippet?.channelTitle ?? "YouTube", description: x.snippet?.description ?? "", url: `https://www.youtube.com/watch?v=${x.id!.videoId}`, thumbnail: x.snippet?.thumbnails?.medium?.url ?? null, provider: "YouTube", verified: true }));
+          })
+        : Promise.resolve([]),
+      fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(topic)}&media=podcast&entity=podcast&limit=6`, { signal: timeout }).then(async r => {
+        if (!r.ok) throw new Error("Podcast search is temporarily unavailable.");
+        const body = await r.json() as { results?: Array<{ collectionName?: string; artistName?: string; collectionViewUrl?: string; artworkUrl100?: string; primaryGenreName?: string }> };
+        return (body.results ?? []).map(x => ({ title: x.collectionName ?? "Podcast", creator: x.artistName ?? "Podcast publisher", description: x.primaryGenreName ?? "Podcast series", url: x.collectionViewUrl ?? "", thumbnail: x.artworkUrl100 ?? null, provider: "Apple Podcasts", verified: true })).filter(x => x.url);
+      }),
+      fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(topic + " tutorial project")}&sort=stars&order=desc&per_page=6`, { signal: timeout, headers }).then(async r => {
+        if (!r.ok) throw new Error("GitHub project search is temporarily unavailable.");
+        const body = await r.json() as { items?: Array<{ full_name?: string; description?: string; html_url?: string; stargazers_count?: number; language?: string }> };
+        return (body.items ?? []).map(x => ({ title: x.full_name ?? "GitHub project", creator: x.language ?? "Open-source project", description: x.description ?? "Open-source learning project", url: x.html_url ?? "", thumbnail: null, provider: "GitHub", verified: true, stars: x.stargazers_count ?? 0 })).filter(x => x.url);
+      }),
+    ]);
+    const unwrap = <T,>(result: PromiseSettledResult<T>, fallback: T): T => result.status === "fulfilled" ? result.value : fallback;
+    const videoResults = unwrap(videos, []);
+    const podcastResults = unwrap(podcasts, []);
+    const projectResults = unwrap(projects, []);
+    const youtubeFallback = !this.config.get<string>("YOUTUBE_API_KEY")
+      ? [{ title: `Search YouTube for ${topic}`, creator: "YouTube search", description: "Connect YOUTUBE_API_KEY to show ranked video results and thumbnails here.", url: `https://www.youtube.com/results?search_query=${encodeURIComponent(topic)}`, thumbnail: null, provider: "YouTube", verified: false }]
+      : [];
+    return {
+      topic,
+      videos: [...videoResults, ...youtubeFallback],
+      audio: podcastResults,
+      projects: projectResults,
+      availability: {
+        videos: videos.status === "fulfilled" ? (this.config.get<string>("YOUTUBE_API_KEY") ? "live" : "search_link") : "unavailable",
+        audio: podcasts.status === "fulfilled" ? "live" : "unavailable",
+        projects: projects.status === "fulfilled" ? "live" : "unavailable",
+      },
+    };
+  }
+
 }
