@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Shell, Intro } from "../components/marketing";
+import { Shell, Intro } from "../../components/marketing";
 
 export const metadata: Metadata = {
   title: "Terms of Service",

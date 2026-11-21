@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Shell, Intro } from "../components/marketing";
-import { SUPPORT_EMAIL } from "../../lib/config";
+import { Shell, Intro } from "../../components/marketing";
+import { SUPPORT_EMAIL } from "../../../lib/config";
 
 export const metadata: Metadata = {
   title: "Contact NeuralPath",

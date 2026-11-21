@@ -5,8 +5,8 @@ import {
   Compass, Layers3, Lightbulb, LockKeyhole,
   Palette, Play, Rocket, Sparkles, Target, TrendingUp, WandSparkles,
 } from "lucide-react";
-import { Shell } from "./components/marketing";
-import { HeroArtMotion, HeroCopyMotion, Reveal } from "./components/marketing-motion";
+import { Shell } from "../components/marketing";
+import { HeroArtMotion, HeroCopyMotion, Reveal } from "../components/marketing-motion";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
