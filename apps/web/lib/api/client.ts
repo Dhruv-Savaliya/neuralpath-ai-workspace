@@ -2,7 +2,7 @@
 
 import { createClient } from "../supabase/client";
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
+const baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? (typeof window !== "undefined" ? "" : "")).replace(/\/$/, "");
 
 export type ApiPathItem = {
   id: string;
@@ -131,11 +131,11 @@ export type AiChatResponse = {
   answer: string;
   provider: string;
   model: string;
-  sources: Array<{ citation: string; title: string; url: string | null; similarity: number }>;
+  sources: Array<{ citation: string; title: string; url: string | null; similarity: number; visibility?: "private" | "public" | string }>;
 };
 
 async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 25_000): Promise<T> {
-  if (!baseUrl) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
+  if (baseUrl === undefined) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
   const supabase = createClient();
   const { data, error } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -214,13 +214,36 @@ export const neuralPathApi = {
     request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge", { method: "POST", body: JSON.stringify(input) }),
   ingestWebsite: (input: { url: string; title?: string }) =>
     request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge/website", { method: "POST", body: JSON.stringify(input) }),
+  ingestDocument: async (file: File, title?: string) => {
+    if (baseUrl === undefined) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (error || !token) throw new Error("Your session has expired. Please sign in again.");
+    const formData = new FormData();
+    formData.append("file", file);
+    if (title) formData.append("title", title);
+    const response = await fetch(`${baseUrl}/api/v1/ai/knowledge/document`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!response.ok) {
+      const raw = await response.text();
+      let message = "Document upload failed. Please try again.";
+      try { message = (JSON.parse(raw) as { message?: string }).message ?? message; } catch { /* ignore */ }
+      throw new Error(message);
+    }
+    return response.json() as Promise<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>;
+  },
   deleteKnowledge: (sourceId: string) =>
     request<{ deleted: boolean; chunks_deleted: number }>(`/ai/knowledge/${sourceId}`, { method: "DELETE" }),
 
   askAiStream: async (
     question: string, conversationId: string | undefined, onToken: (token: string) => void, signal?: AbortSignal,
   ): Promise<AiChatResponse> => {
-    if (!baseUrl) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
+    if (baseUrl === undefined) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
     const supabase = createClient();
     const { data, error } = await supabase.auth.getSession();
     const token = data.session?.access_token;
@@ -258,7 +281,12 @@ export const neuralPathApi = {
       catch { throw new Error("NeuralPath sent an invalid stream event. Please retry."); }
       if (event === "token" && typeof payload.content === "string") onToken(payload.content);
       if (event === "done") result = payload as unknown as AiChatResponse;
-      if (event === "error") throw new Error(typeof payload.message === "string" ? payload.message : "NeuralPath could not complete this answer.");
+      if (event === "error") {
+        const err = new Error(typeof payload.message === "string" ? payload.message : "NeuralPath could not complete this answer.") as Error & { code?: unknown; retryable?: boolean };
+        err.code = payload.code ?? "STREAM_INTERRUPTED";
+        err.retryable = payload.retryable !== false;
+        throw err;
+      }
     };
     const drain = () => {
       const delimiter = /(?:\r\n\r\n|\r\r|\n\n)/;

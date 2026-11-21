@@ -111,6 +111,62 @@ export class AiService {
     });
   }
 
+  async ingestDocument(req: AuthenticatedRequest, file: Express.Multer.File, title?: string) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException("No document file was uploaded.");
+    }
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB limit
+    if (file.size > MAX_FILE_SIZE) {
+      throw new BadRequestException("Document exceeds the 10 MB size limit.");
+    }
+
+    const originalName = file.originalname || "document";
+    const extension = originalName.toLowerCase().split(".").pop();
+    const mime = file.mimetype.toLowerCase();
+
+    const isPdf = extension === "pdf" || mime === "application/pdf";
+    const isDocx = extension === "docx" || mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+    if (!isPdf && !isDocx) {
+      throw new BadRequestException("Only PDF (.pdf) and Word (.docx) documents are supported.");
+    }
+
+    let extractedText = "";
+
+    if (isPdf) {
+      try {
+        const pdfParse = require("pdf-parse");
+        const parsed = await pdfParse(file.buffer, { max: 100 });
+        extractedText = parsed.text || "";
+      } catch (err) {
+        this.logger.warn(`PDF parse error: ${err instanceof Error ? err.message : "unknown"}`);
+        throw new BadRequestException("Could not read this PDF. Ensure the file is not encrypted or damaged.");
+      }
+    } else if (isDocx) {
+      try {
+        const mammoth = require("mammoth");
+        const parsed = await mammoth.extractRawText({ buffer: file.buffer });
+        extractedText = parsed.value || "";
+      } catch (err) {
+        this.logger.warn(`DOCX parse error: ${err instanceof Error ? err.message : "unknown"}`);
+        throw new BadRequestException("Could not read this DOCX document. Ensure the file is not corrupted.");
+      }
+    }
+
+    const cleanedText = extractedText.trim();
+    if (!cleanedText || cleanedText.length < 30) {
+      throw new BadRequestException("No readable text found. Scanned or image-only documents are not supported.");
+    }
+
+    const documentTitle = title?.trim() || originalName.replace(/\.[^/.]+$/, "").slice(0, 160) || "Uploaded document";
+
+    return this.ingest(req, {
+      title: documentTitle,
+      content: cleanedText,
+      source_url: undefined,
+    });
+  }
+
   async listKnowledge(req: AuthenticatedRequest) {
     const { data, error } = await req.supabase
       .from("knowledge_chunks")
@@ -209,17 +265,28 @@ export class AiService {
     }
 
     const [queryEmbedding] = await this.embed(req, [question]);
+    const rerankEnabled = this.config.get<string>("RERANK_ENABLED") === "true";
+    const initialMatchCount = rerankEnabled ? 30 : 6;
     const { data, error } = await req.supabase.rpc("match_knowledge_chunks", {
       query_embedding: queryEmbedding,
       match_threshold: 0.25,
-      match_count: 6,
+      match_count: initialMatchCount,
       query_text: question,
     });
     if (error) throw new ServiceUnavailableException("Knowledge retrieval is not ready. Check the Phase 5 database migration.");
 
-    const sources = (data ?? []) as Array<{
+    const rawSources = (data ?? []) as Array<{
       id: string; source_title: string; source_url: string | null; content: string; similarity: number;
     }>;
+    let sources = rawSources;
+    if (rerankEnabled && rawSources.length > 1) {
+      sources = await this.rerankSources(question, rawSources);
+    } else if (rawSources.length > 6) {
+      this.logger.log("Reranking disabled (RERANK_ENABLED!=true); using RRF order.");
+      sources = rawSources.slice(0, 6);
+    } else {
+      this.logger.log("Using standard RRF retrieval order.");
+    }
     const context = sources.length
       ? sources.map((source, index) => `[S${index + 1}] ${source.source_title}\n${source.content}`).join("\n\n")
       : "No private knowledge sources were found for this user.";
@@ -253,6 +320,7 @@ export class AiService {
       title: source.source_title,
       url: source.source_url,
       similarity: Number(source.similarity.toFixed(4)),
+      visibility: (source as { visibility?: string }).visibility || "private",
     }));
     const validated = validateAnswerCitations(generated.answer, candidateSources);
     const { data: savedConversationId, error: saveError } = await req.supabase.rpc("save_ai_exchange", {
@@ -293,11 +361,22 @@ export class AiService {
       historyRows = data ?? [];
     }
     const [queryEmbedding] = await this.embed(req, [question]);
+    const rerankEnabled = this.config.get<string>("RERANK_ENABLED") === "true";
+    const initialMatchCount = rerankEnabled ? 30 : 6;
     const { data, error } = await req.supabase.rpc("match_knowledge_chunks", {
-      query_embedding: queryEmbedding, match_threshold: 0.25, match_count: 6, query_text: question,
+      query_embedding: queryEmbedding, match_threshold: 0.25, match_count: initialMatchCount, query_text: question,
     });
     if (error) throw new ServiceUnavailableException("Knowledge retrieval is not ready. Check the Phase 5 database migration.");
-    const sources = (data ?? []) as Array<{ id: string; source_title: string; source_url: string | null; content: string; similarity: number }>;
+    const rawSources = (data ?? []) as Array<{ id: string; source_title: string; source_url: string | null; content: string; similarity: number }>;
+    let sources = rawSources;
+    if (rerankEnabled && rawSources.length > 1) {
+      sources = await this.rerankSources(question, rawSources);
+    } else if (rawSources.length > 6) {
+      this.logger.log("Reranking disabled (RERANK_ENABLED!=true); using RRF order.");
+      sources = rawSources.slice(0, 6);
+    } else {
+      this.logger.log("Using standard RRF retrieval order.");
+    }
     const context = sources.length
       ? sources.map((source, i) => `[S${i + 1}] ${source.source_title}\n${source.content}`).join("\n\n")
       : "No private knowledge sources were found for this user.";
@@ -321,6 +400,7 @@ export class AiService {
     const candidates = sources.map((source, i) => ({
       citation: `S${i + 1}`, title: source.source_title, url: source.source_url,
       similarity: Number(source.similarity.toFixed(4)),
+      visibility: (source as { visibility?: string }).visibility || "private",
     }));
     const validated = validateAnswerCitations(generated.answer, candidates);
     const { data: savedId, error: saveError } = await req.supabase.rpc("save_ai_exchange", {
@@ -332,6 +412,72 @@ export class AiService {
       throw new InternalServerErrorException("Your answer was generated, but the conversation could not be saved. Please retry.");
     }
     return { conversation_id: savedId, answer: validated.answer, provider: generated.provider, model: generated.model, sources: validated.sources };
+  }
+
+  private async rerankSources<T extends { content: string }>(query: string, candidates: T[]): Promise<T[]> {
+    const accountId = this.config.get<string>("CLOUDFLARE_ACCOUNT_ID");
+    const apiToken = this.config.get<string>("CLOUDFLARE_API_TOKEN");
+    const rerankerModel = this.config.get<string>("CLOUDFLARE_RERANKER_MODEL") || "@cf/baai/bge-reranker-base";
+
+    if (!accountId || !apiToken) {
+      this.logger.warn("Reranking skipped: Cloudflare credentials not configured; using RRF order.");
+      return candidates.slice(0, 6);
+    }
+
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 2000);
+
+      const response = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${rerankerModel}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            query,
+            contexts: candidates.map(c => ({ text: c.content.slice(0, 600) })),
+          }),
+          signal: controller.signal,
+        }
+      );
+      clearTimeout(timer);
+
+      if (!response.ok) {
+        this.logger.warn(`Reranker failed with status ${response.status}; falling back to RRF order.`);
+        return candidates.slice(0, 6);
+      }
+
+      const data = await response.json() as {
+        result?: Array<{ id?: number; score?: number }> | { scores?: number[] };
+      };
+
+      let scores: number[] | null = null;
+      if (Array.isArray(data.result)) {
+        scores = data.result.map(r => r.score ?? 0);
+      } else if (data.result && Array.isArray((data.result as { scores?: number[] }).scores)) {
+        scores = (data.result as { scores: number[] }).scores;
+      }
+
+      if (scores && scores.length === candidates.length) {
+        const scored = candidates.map((candidate, index) => ({
+          candidate,
+          rerankScore: scores![index],
+        }));
+        scored.sort((a, b) => b.rerankScore - a.rerankScore);
+        this.logger.log(`Second-stage reranker applied via ${rerankerModel}: kept top ${Math.min(scored.length, 6)} of ${candidates.length}`);
+        return scored.slice(0, 6).map(s => s.candidate);
+      }
+
+      this.logger.warn("Reranker returned unexpected format; falling back to RRF order.");
+      return candidates.slice(0, 6);
+    } catch (error) {
+      const reason = error instanceof DOMException && error.name === "AbortError" ? "timeout after 2s" : (error instanceof Error ? error.message : "unknown");
+      this.logger.warn(`Reranker failed (${reason}); falling back to RRF order.`);
+      return candidates.slice(0, 6);
+    }
   }
 
   private async generateStreaming(req: AuthenticatedRequest, prompt: string, signal: AbortSignal, onToken: (token: string) => void) {

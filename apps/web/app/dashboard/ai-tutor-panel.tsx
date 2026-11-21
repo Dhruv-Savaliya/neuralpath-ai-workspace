@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, BookOpen, Bot, LoaderCircle, MessageCircle, Plus, Send, Trash2, UserRound } from "lucide-react";
 import { neuralPathApi, type AiChatResponse, type AiConversation, type KnowledgeSource } from "../../lib/api/client";
+import { MarkdownMessage } from "./markdown-message";
 
 type ChatMessage = {
   id: string;
@@ -10,6 +11,8 @@ type ChatMessage = {
   text: string;
   result?: AiChatResponse;
   sources?: AiChatResponse["sources"];
+  interrupted?: boolean;
+  retryPrompt?: string;
 };
 
 export default function AiTutorPanel() {
@@ -22,6 +25,10 @@ export default function AiTutorPanel() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docTitle, setDocTitle] = useState("");
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [loading, setLoading] = useState(false);
   const [ingesting, setIngesting] = useState(false);
   const [error, setError] = useState("");
@@ -101,34 +108,94 @@ export default function AiTutorPanel() {
     }
   }
 
-  async function ask(event: FormEvent<HTMLFormElement>) {
+  async function uploadDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const prompt = question.trim();
+    if (!docFile) {
+      setError("Please select a PDF or DOCX file to upload.");
+      return;
+    }
+    if (docFile.size > 10 * 1024 * 1024) {
+      setError("Document exceeds the 10 MB size limit.");
+      return;
+    }
+    setUploadingDoc(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await neuralPathApi.ingestDocument(docFile, docTitle.trim() || undefined);
+      setDocFile(null);
+      setDocTitle("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setNotice(`Added ${result.chunks_created} searchable chunks from "${result.source_title}" using BGE-M3.`);
+      await loadSources();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to process document.");
+    } finally {
+      setUploadingDoc(false);
+    }
+  }
+
+  async function sendPrompt(promptText: string) {
+    const prompt = promptText.trim();
     if (prompt.length < 2 || loading) return;
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: "user", text: prompt };
     const assistantId = crypto.randomUUID();
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    setMessages(previous => [...previous, userMessage, { id: assistantId, role: "assistant", text: "" }]);
+    setMessages(previous => [...previous, userMessage, { id: assistantId, role: "assistant", text: "", retryPrompt: prompt }]);
     setQuestion("");
     setLoading(true);
     setError("");
+    let receivedTokens = false;
     try {
-      const result = await neuralPathApi.askAiStream(prompt, activeConversationId ?? undefined,
-        token => setMessages(previous => previous.map(message => message.id === assistantId ? { ...message, text: message.text + token } : message)),
-        controller.signal,
+      const result = await neuralPathApi.askAiStream(
+        prompt,
+        activeConversationId ?? undefined,
+        token => {
+          receivedTokens = true;
+          setMessages(previous =>
+            previous.map(message =>
+              message.id === assistantId ? { ...message, text: message.text + token, interrupted: false } : message
+            )
+          );
+        },
+        controller.signal
       );
       setActiveConversationId(result.conversation_id);
       void loadConversations();
-      setMessages(previous => previous.map(message => message.id === assistantId ? { ...message, text: result.answer, result } : message));
+      setMessages(previous =>
+        previous.map(message =>
+          message.id === assistantId ? { ...message, text: result.answer, result, interrupted: false } : message
+        )
+      );
     } catch (cause) {
-      setMessages(previous => previous.filter(message => message.id !== assistantId && message.id !== userMessage.id));
-      setQuestion(prompt);
-      setError(cause instanceof Error ? cause.message : "NeuralPath could not answer right now. Your question is ready to retry.");
+      const isAbort = cause instanceof Error && cause.message === "Generation stopped.";
+      if (isAbort) {
+        setMessages(previous =>
+          previous.filter(message => !(message.id === assistantId && message.text === ""))
+        );
+      } else if (receivedTokens) {
+        setMessages(previous =>
+          previous.map(message =>
+            message.id === assistantId ? { ...message, interrupted: true } : message
+          )
+        );
+      } else {
+        setMessages(previous =>
+          previous.filter(message => message.id !== assistantId && message.id !== userMessage.id)
+        );
+        setQuestion(prompt);
+        setError(cause instanceof Error ? cause.message : "NeuralPath could not answer right now. Your question is ready to retry.");
+      }
     } finally {
       abortControllerRef.current = null;
       setLoading(false);
     }
+  }
+
+  async function ask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await sendPrompt(question);
   }
 
   async function removeSource(source: KnowledgeSource) {
@@ -234,15 +301,31 @@ export default function AiTutorPanel() {
                   <b>{message.role === "user" ? "You" : "NeuralPath"}</b>
                   {message.result ? <span>· {message.result.provider} / {message.result.model}</span> : null}
                 </div>
-                {message.text}
+                {message.role === "assistant" ? <MarkdownMessage content={message.text} /> : message.text}
+                {message.interrupted ? (
+                  <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, color: "#f59e0b" }}>Response interrupted.</span>
+                    <button
+                      type="button"
+                      className="site-button small"
+                      style={{ padding: "3px 9px", fontSize: 11, minHeight: "auto" }}
+                      onClick={() => message.retryPrompt && void sendPrompt(message.retryPrompt)}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : null}
                 {(message.result?.sources ?? message.sources ?? []).length ? (
                   <div style={{ borderTop: "1px solid var(--border,rgba(148,163,184,.18))", marginTop: 10, paddingTop: 8 }}>
                     <small style={{ color: "var(--muted,#9ca3af)", display: "block", marginBottom: 5 }}>Retrieved sources</small>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {(message.result?.sources ?? message.sources ?? []).map(source => (
                         <a key={source.citation} href={source.url ?? undefined} target={source.url ? "_blank" : undefined} rel={source.url ? "noreferrer" : undefined}
-                          style={{ fontSize: 11, padding: "3px 7px", borderRadius: 7, border: "1px solid var(--border,rgba(148,163,184,.2))" }}>
-                          [{source.citation}] {source.title}
+                          style={{ fontSize: 11, padding: "3px 8px", borderRadius: 7, border: "1px solid var(--border,rgba(148,163,184,.2))", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <span>[{source.citation}] {source.title}</span>
+                          <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 4, background: source.visibility === "public" ? "rgba(103,215,237,0.15)" : "rgba(155,140,255,0.15)", color: source.visibility === "public" ? "var(--cyan,#67d7ed)" : "var(--purple,#9b8cff)" }}>
+                            {source.visibility === "public" ? "NeuralPath library" : "Your notes"}
+                          </span>
                         </a>
                       ))}
                     </div>
@@ -285,8 +368,28 @@ export default function AiTutorPanel() {
                 {ingesting ? <LoaderCircle size={15}/> : <Plus size={15}/>} {ingesting ? "Embedding material…" : "Save to knowledge library"}
               </button>
               <small style={{ color: "var(--muted,#9ca3af)", lineHeight: 1.5 }}>
-                Paste text or import a public HTTPS webpage. Webpage imports are fetched securely, cleaned of scripts and navigation, then split into chunks and embedded with Cloudflare BGE-M3. PDF, DOCX and video transcript imports are not supported yet.
+                Paste text, import a public HTTPS webpage, or upload PDF and DOCX files. Files and webpages are parsed, cleaned, chunked and embedded with Cloudflare BGE-M3 into your private library. Video transcripts are not yet supported.
               </small>
+            </form>
+            <form onSubmit={uploadDocument} style={{ display: "grid", gap: 10, marginTop: 14, paddingTop: 14, borderTop: "1px dashed var(--border,rgba(148,163,184,.25))" }}>
+              <span style={{ fontSize: 12, fontWeight: 650, display: "flex", alignItems: "center", gap: 6 }}>
+                📄 Upload document (PDF / DOCX)
+              </span>
+              <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Document title (optional)
+                <input value={docTitle} onChange={e => setDocTitle(e.target.value)} maxLength={160} placeholder="Defaults to file name" />
+              </label>
+              <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Document file (PDF or DOCX, max 10 MB)
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={e => setDocFile(e.target.files?.[0] || null)}
+                  required
+                />
+              </label>
+              <button className="primary-btn" type="submit" disabled={uploadingDoc || !docFile}>
+                {uploadingDoc ? <LoaderCircle size={15}/> : <Plus size={15}/>} {uploadingDoc ? "Parsing & embedding…" : "Upload document"}
+              </button>
             </form>
           </details>
 
