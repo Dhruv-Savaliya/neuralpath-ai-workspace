@@ -84,7 +84,7 @@ test("streaming does not fall back after the first provider token", async () => 
   global.fetch = async url => {
     calls.push(String(url));
     return new Response(
-      'data: {"choices":[{"delta":{"content":"partial"}}]}\\n\\n',
+      'data: {"choices":[{"delta":{"content":"partial"}}]}\n\n',
       { status: 200, headers: { "Content-Type": "text/event-stream" } },
     );
   };
@@ -123,7 +123,6 @@ test("streaming falls back to Gemini when Groq fails before emitting a token", a
       'data: {"candidates":[{"content":{"parts":[{"text":"Gemini answer"}]}}]}\n\n',
       { status: 200, headers: { "Content-Type": "text/event-stream" } },
     );
-  };
   try {
     const service = new AiService(makeConfig({
       GROQ_API_KEY: "groq-test",
