@@ -15,6 +15,7 @@ import type { IngestKnowledgeDto } from "./dto/ingest-knowledge.dto";
 import type { IngestWebsiteDto } from "./dto/ingest-website.dto";
 import { fetchPublicWebpage } from "./website-ingestion";
 import { validateAnswerCitations } from "./citations";
+import { chunkKnowledgeText } from "./chunking";
 
 type EmbeddingResponse = {
   success?: boolean;
@@ -211,6 +212,7 @@ export class AiService {
       query_embedding: queryEmbedding,
       match_threshold: 0.25,
       match_count: 6,
+      query_text: question,
     });
     if (error) throw new ServiceUnavailableException("Knowledge retrieval is not ready. Check the Phase 5 database migration.");
 
@@ -291,7 +293,7 @@ export class AiService {
     }
     const [queryEmbedding] = await this.embed(req, [question]);
     const { data, error } = await req.supabase.rpc("match_knowledge_chunks", {
-      query_embedding: queryEmbedding, match_threshold: 0.25, match_count: 6,
+      query_embedding: queryEmbedding, match_threshold: 0.25, match_count: 6, query_text: question,
     });
     if (error) throw new ServiceUnavailableException("Knowledge retrieval is not ready. Check the Phase 5 database migration.");
     const sources = (data ?? []) as Array<{ id: string; source_title: string; source_url: string | null; content: string; similarity: number }>;
@@ -487,21 +489,7 @@ export class AiService {
   }
 
   private chunkText(input: string): string[] {
-    const normalized = input.replace(/\r\n/g, "\n").replace(/[\t ]+/g, " ").trim();
-    const chunks: string[] = [];
-    let start = 0;
-    while (start < normalized.length) {
-      let end = Math.min(start + this.chunkSize, normalized.length);
-      if (end < normalized.length) {
-        const boundary = normalized.lastIndexOf(" ", end);
-        if (boundary > start + Math.floor(this.chunkSize * 0.6)) end = boundary;
-      }
-      const chunk = normalized.slice(start, end).trim();
-      if (chunk.length >= 40) chunks.push(chunk);
-      if (end >= normalized.length) break;
-      start = Math.max(end - this.chunkOverlap, start + 1);
-    }
-    return chunks;
+    return chunkKnowledgeText(input, this.chunkSize, this.chunkOverlap);
   }
 
   private async embed(req: AuthenticatedRequest, texts: string[]): Promise<number[][]> {
