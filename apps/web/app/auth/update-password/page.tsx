@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { updatePassword } from "../../actions/auth";
+
+export const metadata: Metadata = {
+  title: "Choose a new password",
+  description: "Set a new password for your NeuralPath account.",
+  robots: { index: false, follow: false },
+};
 
 export default async function UpdatePassword({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
