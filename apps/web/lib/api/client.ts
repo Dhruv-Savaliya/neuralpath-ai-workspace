@@ -133,6 +133,7 @@ export type LearningResource = {
   description: string;
   url: string;
   thumbnail: string | null;
+  audioUrl?: string | null;
   provider: "YouTube" | "Apple Podcasts" | "GitHub";
   verified: boolean;
   stars?: number;
