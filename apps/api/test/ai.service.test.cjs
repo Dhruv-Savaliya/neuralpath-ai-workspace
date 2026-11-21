@@ -167,3 +167,76 @@ test("Cloudflare BGE-M3 rejects vectors that do not match vector(1024)", async (
     global.fetch = originalFetch;
   }
 });
+
+
+test("Gemini fallback is used when Groq truncates a curriculum response", async () => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async url => {
+    calls.push(String(url));
+    if (String(url).includes("api.groq.com")) {
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: '{"days":[' }, finish_reason: "length" }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: '{"days":[]}' }] }, finishReason: "STOP" }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  try {
+    const service = new AiService(makeConfig({
+      GROQ_API_KEY: "test-groq-key",
+      GROQ_MODEL: "openai/gpt-oss-120b",
+      GEMINI_API_KEY: "test-gemini-key",
+      GEMINI_MODEL: "gemini-3.8-flash",
+    }));
+    service.recordUsage = async () => {};
+    const result = await service.generateForLearning(makeReq(), "compact curriculum prompt", {
+      jsonMode: true, maxOutputTokens: 1800,
+    });
+    assert.equal(result.provider, "gemini");
+    assert.equal(calls.length, 2);
+    assert.ok(calls[0].includes("api.groq.com"));
+    assert.ok(calls[1].includes("generativelanguage.googleapis.com"));
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("Gemini retries a transient 503 before returning a curriculum response", async () => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async url => {
+    calls.push(String(url));
+    if (String(url).includes("api.groq.com")) {
+      return new Response(JSON.stringify({ error: { message: "daily quota exhausted" } }), {
+        status: 429, headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (calls.filter(value => value.includes("generativelanguage.googleapis.com")).length === 1) {
+      return new Response(JSON.stringify({ error: { message: "temporarily unavailable" } }), {
+        status: 503, headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: '{"days":[]}' }] }, finishReason: "STOP" }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  try {
+    const service = new AiService(makeConfig({
+      GROQ_API_KEY: "test-groq-key",
+      GROQ_MODEL: "openai/gpt-oss-120b",
+      GEMINI_API_KEY: "test-gemini-key",
+      GEMINI_MODEL: "gemini-3.8-flash",
+    }));
+    service.recordUsage = async () => {};
+    const result = await service.generateForLearning(makeReq(), "compact curriculum prompt", {
+      jsonMode: true, maxOutputTokens: 1800,
+    });
+    assert.equal(result.provider, "gemini");
+    assert.equal(calls.length, 3);
+    assert.equal(calls.filter(value => value.includes("generativelanguage.googleapis.com")).length, 2);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
