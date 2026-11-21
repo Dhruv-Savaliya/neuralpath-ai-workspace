@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const { isPublicIpv4, extractWebpageText } = require("../dist/ai/website-ingestion.js");
 
 test("public IPv4 validation rejects private, loopback, link-local and reserved ranges", () => {
-  for (const address of ["10.0.0.1", "127.0.0.1", "192.168.1.10", "172.20.0.2", "169.254.169.254", "100.64.0.1", "224.0.0.1"]) {
+  for (const address of ["0.1.2.3", "10.0.0.1", "127.0.0.1", "192.168.1.10", "192.88.99.1", "172.20.0.2", "169.254.169.254", "100.64.0.1", "198.18.0.1", "198.51.100.1", "203.0.113.1", "224.0.0.1", "240.0.0.1"]) {
     assert.equal(isPublicIpv4(address), false, address);
   }
   assert.equal(isPublicIpv4("8.8.8.8"), true);
