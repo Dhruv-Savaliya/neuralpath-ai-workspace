@@ -11,6 +11,8 @@ type ChatMessage = {
   text: string;
   result?: AiChatResponse;
   sources?: AiChatResponse["sources"];
+  interrupted?: boolean;
+  retryPrompt?: string;
 };
 
 export default function AiTutorPanel() {
@@ -102,34 +104,67 @@ export default function AiTutorPanel() {
     }
   }
 
-  async function ask(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const prompt = question.trim();
+  async function sendPrompt(promptText: string) {
+    const prompt = promptText.trim();
     if (prompt.length < 2 || loading) return;
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: "user", text: prompt };
     const assistantId = crypto.randomUUID();
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    setMessages(previous => [...previous, userMessage, { id: assistantId, role: "assistant", text: "" }]);
+    setMessages(previous => [...previous, userMessage, { id: assistantId, role: "assistant", text: "", retryPrompt: prompt }]);
     setQuestion("");
     setLoading(true);
     setError("");
+    let receivedTokens = false;
     try {
-      const result = await neuralPathApi.askAiStream(prompt, activeConversationId ?? undefined,
-        token => setMessages(previous => previous.map(message => message.id === assistantId ? { ...message, text: message.text + token } : message)),
-        controller.signal,
+      const result = await neuralPathApi.askAiStream(
+        prompt,
+        activeConversationId ?? undefined,
+        token => {
+          receivedTokens = true;
+          setMessages(previous =>
+            previous.map(message =>
+              message.id === assistantId ? { ...message, text: message.text + token, interrupted: false } : message
+            )
+          );
+        },
+        controller.signal
       );
       setActiveConversationId(result.conversation_id);
       void loadConversations();
-      setMessages(previous => previous.map(message => message.id === assistantId ? { ...message, text: result.answer, result } : message));
+      setMessages(previous =>
+        previous.map(message =>
+          message.id === assistantId ? { ...message, text: result.answer, result, interrupted: false } : message
+        )
+      );
     } catch (cause) {
-      setMessages(previous => previous.filter(message => message.id !== assistantId && message.id !== userMessage.id));
-      setQuestion(prompt);
-      setError(cause instanceof Error ? cause.message : "NeuralPath could not answer right now. Your question is ready to retry.");
+      const isAbort = cause instanceof Error && cause.message === "Generation stopped.";
+      if (isAbort) {
+        setMessages(previous =>
+          previous.filter(message => !(message.id === assistantId && message.text === ""))
+        );
+      } else if (receivedTokens) {
+        setMessages(previous =>
+          previous.map(message =>
+            message.id === assistantId ? { ...message, interrupted: true } : message
+          )
+        );
+      } else {
+        setMessages(previous =>
+          previous.filter(message => message.id !== assistantId && message.id !== userMessage.id)
+        );
+        setQuestion(prompt);
+        setError(cause instanceof Error ? cause.message : "NeuralPath could not answer right now. Your question is ready to retry.");
+      }
     } finally {
       abortControllerRef.current = null;
       setLoading(false);
     }
+  }
+
+  async function ask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await sendPrompt(question);
   }
 
   async function removeSource(source: KnowledgeSource) {
@@ -236,6 +271,19 @@ export default function AiTutorPanel() {
                   {message.result ? <span>· {message.result.provider} / {message.result.model}</span> : null}
                 </div>
                 {message.role === "assistant" ? <MarkdownMessage content={message.text} /> : message.text}
+                {message.interrupted ? (
+                  <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, color: "#f59e0b" }}>Response interrupted.</span>
+                    <button
+                      type="button"
+                      className="site-button small"
+                      style={{ padding: "3px 9px", fontSize: 11, minHeight: "auto" }}
+                      onClick={() => message.retryPrompt && void sendPrompt(message.retryPrompt)}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : null}
                 {(message.result?.sources ?? message.sources ?? []).length ? (
                   <div style={{ borderTop: "1px solid var(--border,rgba(148,163,184,.18))", marginTop: 10, paddingTop: 8 }}>
                     <small style={{ color: "var(--muted,#9ca3af)", display: "block", marginBottom: 5 }}>Retrieved sources</small>

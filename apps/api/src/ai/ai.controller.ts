@@ -72,7 +72,8 @@ export class AiController {
         this.logger.warn("AI Tutor stream ended before completion.");
         const message = error instanceof Error && /budget|quota/i.test(error.message)
           ? error.message : "NeuralPath could not complete this answer. Please try again.";
-        send("error", { message });
+        const code = error instanceof Error && (error as any).status === 429 ? "QUOTA_EXCEEDED" : "STREAM_INTERRUPTED";
+        send("error", { code, message, retryable: true });
       }
     } finally { if (!res.writableEnded) res.end(); }
   }

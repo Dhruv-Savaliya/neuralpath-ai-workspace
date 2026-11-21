@@ -258,7 +258,12 @@ export const neuralPathApi = {
       catch { throw new Error("NeuralPath sent an invalid stream event. Please retry."); }
       if (event === "token" && typeof payload.content === "string") onToken(payload.content);
       if (event === "done") result = payload as unknown as AiChatResponse;
-      if (event === "error") throw new Error(typeof payload.message === "string" ? payload.message : "NeuralPath could not complete this answer.");
+      if (event === "error") {
+        const err = new Error(typeof payload.message === "string" ? payload.message : "NeuralPath could not complete this answer.");
+        (err as any).code = payload.code ?? "STREAM_INTERRUPTED";
+        (err as any).retryable = payload.retryable ?? true;
+        throw err;
+      }
     };
     const drain = () => {
       const delimiter = /(?:\r\n\r\n|\r\r|\n\n)/;
