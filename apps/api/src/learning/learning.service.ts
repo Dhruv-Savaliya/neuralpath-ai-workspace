@@ -159,8 +159,7 @@ export class LearningService {
       (progressByItem.get(item.id)?.status ?? item.status) === "completed",
     );
     const completedDates = progressRows
-      .filter(row => row.completed_at)
-      .map(row => row.completed_at);
+      .flatMap(row => row.completed_at ? [row.completed_at] : []);
     const nowDate = now;
 
     return {
