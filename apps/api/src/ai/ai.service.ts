@@ -377,13 +377,15 @@ export class AiService {
     await consumeSseStream(response.body, signal, ({ data }) => {
       if (finished || !data) return;
       if (data === "[DONE]") { finished = true; return; }
+      let payload: { choices?: Array<{ delta?: { content?: string | null } }> };
       try {
-        const payload = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string | null } }> };
-        const token = payload.choices?.[0]?.delta?.content;
-        if (token) { answer += token; onToken(token); }
+        payload = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string | null } }> };
       } catch {
         this.logger.warn("Groq returned a malformed SSE event; ignoring that event.");
+        return;
       }
+      const token = payload.choices?.[0]?.delta?.content;
+      if (token) { answer += token; onToken(token); }
     });
     return answer;
   }
@@ -404,13 +406,15 @@ export class AiService {
     let answer = "";
     await consumeSseStream(response.body, signal, ({ data }) => {
       if (!data || data === "[DONE]") return;
+      let payload: GeminiResponse;
       try {
-        const payload = JSON.parse(data) as GeminiResponse;
-        const token = payload.candidates?.[0]?.content?.parts?.map(part => part.text ?? "").join("") ?? "";
-        if (token) { answer += token; onToken(token); }
+        payload = JSON.parse(data) as GeminiResponse;
       } catch {
         this.logger.warn("Gemini returned a malformed SSE event; ignoring that event.");
+        return;
       }
+      const token = payload.candidates?.[0]?.content?.parts?.map(part => part.text ?? "").join("") ?? "";
+      if (token) { answer += token; onToken(token); }
     });
     return answer;
   }
