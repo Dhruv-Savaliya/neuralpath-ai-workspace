@@ -13,8 +13,10 @@ function makeDb(responses) {
         filters: [],
         select(value) { calls.push({ table, method: "select", value }); return this; },
         eq(column, value) { this.filters.push([column, value]); calls.push({ table, method: "eq", column, value }); return this; },
-        order() { return this; },
-        limit() { return this; },
+        order(column, options) { calls.push({ table, method: "order", column, options }); return this; },
+        limit(value) { calls.push({ table, method: "limit", value }); return this; },
+        in(column, value) { this.filters.push([column, value]); calls.push({ table, method: "in", column, value }); return this; },
+        gte(column, value) { this.filters.push([column, value]); calls.push({ table, method: "gte", column, value }); return this; },
         gt() { return this; },
         is() { return this; },
         neq() { return this; },
@@ -148,4 +150,20 @@ test("acceptRecommendation validates task ownership before recording learner app
   assert.deepEqual(result, { accepted: true, action: "focus_task" });
   assert.ok(db.calls.some(call => call.table === "learning_path_items" && call.method === "eq" && call.column === "user_id" && call.value === "learner-a"));
   assert.ok(db.calls.some(call => call.table === "learning_recommendations" && call.method === "eq" && call.column === "user_id" && call.value === "learner-a"));
+});
+
+test("loadContext bounds learner analytics to active goals, one path and recent activity", async () => {
+  const db = makeDb(contextData());
+  const service = new LearningService({ generateForLearning: async () => { throw new Error("not used"); } });
+  await service.getInsights(learnerRequest(db));
+
+  assert.ok(db.calls.some(call => call.table === "learning_goals" && call.method === "eq" && call.column === "status" && call.value === "active"));
+  assert.ok(db.calls.some(call => call.table === "learning_goals" && call.method === "limit" && call.value === 100));
+  assert.ok(db.calls.some(call => call.table === "learning_paths" && call.method === "eq" && call.column === "status" && call.value === "active"));
+  assert.ok(db.calls.some(call => call.table === "learning_paths" && call.method === "limit" && call.value === 1));
+  assert.ok(db.calls.some(call => call.table === "learning_path_items" && call.method === "eq" && call.column === "path_id" && call.value === "path-a"));
+  assert.ok(db.calls.some(call => call.table === "learning_path_items" && call.method === "limit" && call.value === 200));
+  assert.ok(db.calls.some(call => call.table === "learning_progress" && call.method === "in" && call.column === "path_item_id"));
+  assert.ok(db.calls.some(call => call.table === "learning_progress" && call.method === "gte" && call.column === "completed_at"));
+  assert.ok(db.calls.some(call => call.table === "learning_progress" && call.method === "limit" && call.value === 1000));
 });
