@@ -248,24 +248,45 @@ export const neuralPathApi = {
     if (!response.body) throw new Error("Your browser could not read the AI response stream.");
     const reader = response.body.getReader(), decoder = new TextDecoder();
     let buffer = "", result: AiChatResponse | null = null;
+    const processBlock = (block: string) => {
+      const lines = block.split(/\r\n|\r|\n/);
+      const event = lines.find(line => line.startsWith("event:"))?.slice(6).trim() ?? "message";
+      const data = lines.filter(line => line.startsWith("data:")).map(line => line.slice(5).replace(/^ /, "")).join("\n");
+      if (!data) return;
+      let payload: Record<string, unknown>;
+      try { payload = JSON.parse(data) as Record<string, unknown>; }
+      catch { throw new Error("NeuralPath sent an invalid stream event. Please retry."); }
+      if (event === "token" && typeof payload.content === "string") onToken(payload.content);
+      if (event === "done") result = payload as unknown as AiChatResponse;
+      if (event === "error") throw new Error(typeof payload.message === "string" ? payload.message : "NeuralPath could not complete this answer.");
+    };
+    const drain = () => {
+      const delimiter = /(?:\r\n\r\n|\r\r|\n\n)/;
+      let match: RegExpExecArray | null;
+      while ((match = delimiter.exec(buffer))) {
+        const block = buffer.slice(0, match.index);
+        buffer = buffer.slice(match.index + match[0].length);
+        processBlock(block);
+      }
+    };
     try {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const blocks = buffer.split("\n\n"); buffer = blocks.pop() ?? "";
-        for (const block of blocks) {
-          const event = block.split("\n").find(line => line.startsWith("event:"))?.slice(6).trim();
-          const data = block.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("");
-          if (!data) continue;
-          let payload: Record<string, unknown>;
-          try { payload = JSON.parse(data) as Record<string, unknown>; } catch { continue; }
-          if (event === "token" && typeof payload.content === "string") onToken(payload.content);
-          if (event === "done") result = payload as unknown as AiChatResponse;
-          if (event === "error") throw new Error(typeof payload.message === "string" ? payload.message : "NeuralPath could not complete this answer.");
-        }
+        drain();
       }
-    } finally { reader.releaseLock(); }
+      buffer += decoder.decode();
+      drain();
+      if (buffer.trim()) processBlock(buffer);
+    } catch (cause) {
+      if (signal?.aborted || (cause instanceof DOMException && cause.name === "AbortError")) throw new Error("Generation stopped.");
+      if (cause instanceof DOMException && cause.name === "TimeoutError") throw new Error("This is taking longer than expected. Please try again.");
+      throw cause;
+    } finally {
+      if (signal?.aborted) await reader.cancel().catch(() => undefined);
+      reader.releaseLock();
+    }
     if (!result) throw new Error("The AI response ended before completion. Please retry.");
     return result;
   },
