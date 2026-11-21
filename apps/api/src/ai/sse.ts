@@ -37,7 +37,7 @@ export async function consumeSseStream(
   };
 
   const drain = () => {
-    const delimiter = /(?:\r\n|\r|\n){2}/;
+    const delimiter = /(?:\r\n\r\n|\r\r|\n\n)/;
     let match: RegExpExecArray | null;
     while ((match = delimiter.exec(buffer))) {
       const block = buffer.slice(0, match.index);
