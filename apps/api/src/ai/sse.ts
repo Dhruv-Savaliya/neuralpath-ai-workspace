@@ -54,6 +54,7 @@ export async function consumeSseStream(
       buffer += decoder.decode(value, { stream: true });
       drain();
     }
+    if (signal?.aborted) throw new DOMException("The operation was aborted.", "AbortError");
     buffer += decoder.decode();
     drain();
     if (buffer.length) dispatch(buffer);
