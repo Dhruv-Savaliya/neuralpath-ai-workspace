@@ -465,7 +465,7 @@ function ResourceGroup({ title, items, empty }: { title: string; items: Learning
         {item.thumbnail ? <img src={item.thumbnail} alt="" loading="lazy" style={{ width: 76, height: 52, objectFit: "cover", borderRadius: 6 }}/> : null}
         <span style={{ minWidth: 0, flex: 1 }}><b style={{ display: "block", fontSize: 12, lineHeight: 1.4 }}>{item.title}</b><small style={{ display: "block", color: "var(--muted,#9ca3af)", marginTop: 3 }}>{item.creator} · {item.provider}{item.stars ? ` · ★ ${item.stars.toLocaleString()}` : ""}</small><small style={{ display: "block", color: "var(--muted,#9ca3af)", marginTop: 2 }}>{item.description.slice(0, 180)}</small></span>
         <ExternalLink size={14}/>
-      </a>)}
+      </a>{item.audioUrl ? <audio key={item.audioUrl} controls preload="none" src={item.audioUrl} style={{ width: "100%", height: 38 }}/> : null}</div>)}
     </div> : <p style={{ color: "var(--muted,#9ca3af)", fontSize: 12, margin: 0 }}>{empty}</p>}
   </section>;
 }
