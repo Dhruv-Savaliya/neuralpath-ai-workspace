@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, RefreshCw, Server } from "lucide-react";
+export const metadata: Metadata = {
+  title: "Service unavailable",
+  description: "NeuralPath is temporarily unavailable. Please try again shortly.",
+  robots: { index: false, follow: false },
+};
+
 export default function HttpVersionNotSupported() {
   return <main className="np-error-page"><div className="np-error-stars" aria-hidden="true"/><div className="np-error-content">
     <div className="np-error-symbol"><Server size={29}/></div><span className="np-eyebrow"><i/> PROTOCOL MISMATCH</span>
