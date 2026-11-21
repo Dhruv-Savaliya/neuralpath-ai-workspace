@@ -461,7 +461,7 @@ function ResourceGroup({ title, items, empty }: { title: string; items: Learning
   return <section>
     <b style={{ display: "block", fontSize: 13, marginBottom: 7 }}>{title}</b>
     {items.length ? <div style={{ display: "grid", gap: 7 }}>
-      {items.map((item, index) => <a key={item.url || index} href={item.url} target="_blank" rel="noreferrer" style={{ display: "flex", gap: 10, alignItems: "center", padding: 9, border: "1px solid var(--border,rgba(148,163,184,.16))", borderRadius: 9, color: "inherit", textDecoration: "none" }}>
+      {items.map((item, index) => <div key={item.url || index} style={{ display: "grid", gap: 6 }}><a href={item.url} target="_blank" rel="noreferrer" style={{ display: "flex", gap: 10, alignItems: "center", padding: 9, border: "1px solid var(--border,rgba(148,163,184,.16))", borderRadius: 9, color: "inherit", textDecoration: "none" }}>
         {item.thumbnail ? <img src={item.thumbnail} alt="" loading="lazy" style={{ width: 76, height: 52, objectFit: "cover", borderRadius: 6 }}/> : null}
         <span style={{ minWidth: 0, flex: 1 }}><b style={{ display: "block", fontSize: 12, lineHeight: 1.4 }}>{item.title}</b><small style={{ display: "block", color: "var(--muted,#9ca3af)", marginTop: 3 }}>{item.creator} · {item.provider}{item.stars ? ` · ★ ${item.stars.toLocaleString()}` : ""}</small><small style={{ display: "block", color: "var(--muted,#9ca3af)", marginTop: 2 }}>{item.description.slice(0, 180)}</small></span>
         <ExternalLink size={14}/>
