@@ -10,7 +10,7 @@ import { HeroArtMotion, HeroCopyMotion, Reveal } from "./components/marketing-mo
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "AI Tutor for Every Subject | NeuralPath",
+  title: "AI Tutor for Every Subject",
   description: "Learn coding, mathematics, science, business, design and more with an AI tutor that explains concepts, adapts to your level and helps you practise.",
   alternates: { canonical: "/" },
   openGraph: {
