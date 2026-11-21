@@ -279,6 +279,7 @@ export const neuralPathApi = {
       if (buffer.trim()) processBlock(buffer);
     } catch (cause) {
       if (signal?.aborted || (cause instanceof DOMException && cause.name === "AbortError")) throw new Error("Generation stopped.");
+      if (cause instanceof DOMException && cause.name === "TimeoutError") throw new Error("This is taking longer than expected. Please try again.");
       throw cause;
     } finally {
       if (signal?.aborted) await reader.cancel().catch(() => undefined);
