@@ -16,6 +16,7 @@ import type { IngestWebsiteDto } from "./dto/ingest-website.dto";
 import { fetchPublicWebpage } from "./website-ingestion";
 import { validateAnswerCitations } from "./citations";
 import { chunkKnowledgeText } from "./chunking";
+import { consumeSseStream } from "./sse";
 
 type EmbeddingResponse = {
   success?: boolean;
@@ -396,31 +397,22 @@ export class AiService {
       throw new ProviderError(payload.error?.message ?? "Groq streaming request failed.", response.status, response.status === 429);
     }
     if (!response.body) throw new ProviderError("Groq did not return a readable stream.", 502);
-    const reader = response.body.getReader(), decoder = new TextDecoder();
-    let buffer = "", answer = "";
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const blocks = buffer.split(/\r?\n\r?\n/); buffer = blocks.pop() ?? "";
-        for (const block of blocks) {
-          const line = block.split(/\r?\n/).find(item => item.startsWith("data:"));
-          if (!line) continue;
-          const data = line.slice(5).trim();
-          if (data === "[DONE]") return answer;
-          try {
-            const payload = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string | null } }> };
-            const token = payload.choices?.[0]?.delta?.content;
-            if (token) { answer += token; onToken(token); }
-          } catch { /* ignore incomplete provider frames */ }
-        }
+    let answer = "";
+    let finished = false;
+    await consumeSseStream(response.body, signal, ({ data }) => {
+      if (finished || !data) return;
+      if (data === "[DONE]") { finished = true; return; }
+      let payload: { choices?: Array<{ delta?: { content?: string | null } }> };
+      try {
+        payload = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string | null } }> };
+      } catch {
+        this.logger.warn("Groq returned a malformed SSE event; ignoring that event.");
+        return;
       }
-      return answer;
-    } finally {
-      if (signal.aborted) await reader.cancel().catch(() => undefined);
-      reader.releaseLock();
-    }
+      const token = payload.choices?.[0]?.delta?.content;
+      if (token) { answer += token; onToken(token); }
+    });
+    return answer;
   }
 
   private async streamGemini(apiKey: string, model: string, prompt: string, maxTokens: number, signal: AbortSignal, onToken: (token: string) => void) {
@@ -436,29 +428,20 @@ export class AiService {
       throw new ProviderError(payload.error?.message ?? "Gemini streaming request failed.", response.status, response.status === 429);
     }
     if (!response.body) throw new ProviderError("Gemini did not return a readable stream.", 502);
-    const reader = response.body.getReader(), decoder = new TextDecoder();
-    let buffer = "", answer = "";
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const blocks = buffer.split(/\r?\n\r?\n/); buffer = blocks.pop() ?? "";
-        for (const block of blocks) {
-          const data = block.split(/\r?\n/).filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("");
-          if (!data || data === "[DONE]") continue;
-          try {
-            const payload = JSON.parse(data) as GeminiResponse;
-            const token = payload.candidates?.[0]?.content?.parts?.map(part => part.text ?? "").join("") ?? "";
-            if (token) { answer += token; onToken(token); }
-          } catch { /* ignore incomplete provider frames */ }
-        }
+    let answer = "";
+    await consumeSseStream(response.body, signal, ({ data }) => {
+      if (!data || data === "[DONE]") return;
+      let payload: GeminiResponse;
+      try {
+        payload = JSON.parse(data) as GeminiResponse;
+      } catch {
+        this.logger.warn("Gemini returned a malformed SSE event; ignoring that event.");
+        return;
       }
-      return answer;
-    } finally {
-      if (signal.aborted) await reader.cancel().catch(() => undefined);
-      reader.releaseLock();
-    }
+      const token = payload.candidates?.[0]?.content?.parts?.map(part => part.text ?? "").join("") ?? "";
+      if (token) { answer += token; onToken(token); }
+    });
+    return answer;
   }
 
   async generateForLearning(
