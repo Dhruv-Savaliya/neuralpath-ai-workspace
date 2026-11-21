@@ -111,6 +111,62 @@ export class AiService {
     });
   }
 
+  async ingestDocument(req: AuthenticatedRequest, file: Express.Multer.File, title?: string) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException("No document file was uploaded.");
+    }
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB limit
+    if (file.size > MAX_FILE_SIZE) {
+      throw new BadRequestException("Document exceeds the 10 MB size limit.");
+    }
+
+    const originalName = file.originalname || "document";
+    const extension = originalName.toLowerCase().split(".").pop();
+    const mime = file.mimetype.toLowerCase();
+
+    const isPdf = extension === "pdf" || mime === "application/pdf";
+    const isDocx = extension === "docx" || mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+    if (!isPdf && !isDocx) {
+      throw new BadRequestException("Only PDF (.pdf) and Word (.docx) documents are supported.");
+    }
+
+    let extractedText = "";
+
+    if (isPdf) {
+      try {
+        const pdfParse = require("pdf-parse");
+        const parsed = await pdfParse(file.buffer, { max: 100 });
+        extractedText = parsed.text || "";
+      } catch (err) {
+        this.logger.warn(`PDF parse error: ${err instanceof Error ? err.message : "unknown"}`);
+        throw new BadRequestException("Could not read this PDF. Ensure the file is not encrypted or damaged.");
+      }
+    } else if (isDocx) {
+      try {
+        const mammoth = require("mammoth");
+        const parsed = await mammoth.extractRawText({ buffer: file.buffer });
+        extractedText = parsed.value || "";
+      } catch (err) {
+        this.logger.warn(`DOCX parse error: ${err instanceof Error ? err.message : "unknown"}`);
+        throw new BadRequestException("Could not read this DOCX document. Ensure the file is not corrupted.");
+      }
+    }
+
+    const cleanedText = extractedText.trim();
+    if (!cleanedText || cleanedText.length < 30) {
+      throw new BadRequestException("No readable text found. Scanned or image-only documents are not supported.");
+    }
+
+    const documentTitle = title?.trim() || originalName.replace(/\.[^/.]+$/, "").slice(0, 160) || "Uploaded document";
+
+    return this.ingest(req, {
+      title: documentTitle,
+      content: cleanedText,
+      source_url: null,
+    });
+  }
+
   async listKnowledge(req: AuthenticatedRequest) {
     const { data, error } = await req.supabase
       .from("knowledge_chunks")

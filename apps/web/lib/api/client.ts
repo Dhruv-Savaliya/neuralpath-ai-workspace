@@ -214,6 +214,29 @@ export const neuralPathApi = {
     request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge", { method: "POST", body: JSON.stringify(input) }),
   ingestWebsite: (input: { url: string; title?: string }) =>
     request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge/website", { method: "POST", body: JSON.stringify(input) }),
+  ingestDocument: async (file: File, title?: string) => {
+    if (!baseUrl) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (error || !token) throw new Error("Your session has expired. Please sign in again.");
+    const formData = new FormData();
+    formData.append("file", file);
+    if (title) formData.append("title", title);
+    const response = await fetch(`${baseUrl}/api/v1/ai/knowledge/document`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!response.ok) {
+      const raw = await response.text();
+      let message = "Document upload failed. Please try again.";
+      try { message = (JSON.parse(raw) as { message?: string }).message ?? message; } catch { /* ignore */ }
+      throw new Error(message);
+    }
+    return response.json() as Promise<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>;
+  },
   deleteKnowledge: (sourceId: string) =>
     request<{ deleted: boolean; chunks_deleted: number }>(`/ai/knowledge/${sourceId}`, { method: "DELETE" }),
 

@@ -25,6 +25,10 @@ export default function AiTutorPanel() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docTitle, setDocTitle] = useState("");
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [loading, setLoading] = useState(false);
   const [ingesting, setIngesting] = useState(false);
   const [error, setError] = useState("");
@@ -101,6 +105,33 @@ export default function AiTutorPanel() {
       setError(cause instanceof Error ? cause.message : "Unable to add this knowledge source.");
     } finally {
       setIngesting(false);
+    }
+  }
+
+  async function uploadDocument(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!docFile) {
+      setError("Please select a PDF or DOCX file to upload.");
+      return;
+    }
+    if (docFile.size > 10 * 1024 * 1024) {
+      setError("Document exceeds the 10 MB size limit.");
+      return;
+    }
+    setUploadingDoc(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await neuralPathApi.ingestDocument(docFile, docTitle.trim() || undefined);
+      setDocFile(null);
+      setDocTitle("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setNotice(`Added ${result.chunks_created} searchable chunks from "${result.source_title}" using BGE-M3.`);
+      await loadSources();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to process document.");
+    } finally {
+      setUploadingDoc(false);
     }
   }
 
@@ -334,8 +365,28 @@ export default function AiTutorPanel() {
                 {ingesting ? <LoaderCircle size={15}/> : <Plus size={15}/>} {ingesting ? "Embedding material…" : "Save to knowledge library"}
               </button>
               <small style={{ color: "var(--muted,#9ca3af)", lineHeight: 1.5 }}>
-                Paste text or import a public HTTPS webpage. Webpage imports are fetched securely, cleaned of scripts and navigation, then split into chunks and embedded with Cloudflare BGE-M3. PDF, DOCX and video transcript imports are not supported yet.
+                Paste text, import a public HTTPS webpage, or upload PDF and DOCX files. Files and webpages are parsed, cleaned, chunked and embedded with Cloudflare BGE-M3 into your private library. Video transcripts are not yet supported.
               </small>
+            </form>
+            <form onSubmit={uploadDocument} style={{ display: "grid", gap: 10, marginTop: 14, paddingTop: 14, borderTop: "1px dashed var(--border,rgba(148,163,184,.25))" }}>
+              <span style={{ fontSize: 12, fontWeight: 650, display: "flex", alignItems: "center", gap: 6 }}>
+                📄 Upload document (PDF / DOCX)
+              </span>
+              <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Document title (optional)
+                <input value={docTitle} onChange={e => setDocTitle(e.target.value)} maxLength={160} placeholder="Defaults to file name" />
+              </label>
+              <label style={{ display: "grid", gap: 5, fontSize: 12 }}>Document file (PDF or DOCX, max 10 MB)
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={e => setDocFile(e.target.files?.[0] || null)}
+                  required
+                />
+              </label>
+              <button className="primary-btn" type="submit" disabled={uploadingDoc || !docFile}>
+                {uploadingDoc ? <LoaderCircle size={15}/> : <Plus size={15}/>} {uploadingDoc ? "Parsing & embedding…" : "Upload document"}
+              </button>
             </form>
           </details>
 

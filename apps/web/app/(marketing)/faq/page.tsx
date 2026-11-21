@@ -15,7 +15,7 @@ const qs = [
   ["Can I change my goals later?", "Yes. Your learning profile and goals can be updated as your priorities change."],
   ["Is my progress synced across devices?", "Yes. When you sign in, your profile, goals, learning paths, and progress are stored in your account and can be accessed across devices."],
   ["Can the AI tutor remember earlier questions?", "Yes. Signed-in tutor conversations are saved to your account and can be reopened from the AI Tutor panel."],
-  ["Can the tutor read a website just from its URL?", "Yes. Enter a public HTTPS webpage URL and NeuralPath will fetch, clean and embed its content. PDF, DOCX and video transcripts are not yet supported."],
+  ["Can the tutor read a website just from its URL?", "Yes. Enter a public HTTPS webpage URL and NeuralPath will fetch, clean and embed its content. You can also upload PDF and DOCX documents directly. Video transcripts are not yet supported."],
   ["Are AI answers always correct?", "No AI system is perfect. Check important information against trusted sources, and do not use NeuralPath as a substitute for professional advice."],
 ];
 
