@@ -1025,4 +1025,148 @@ export class AiService {
       // Telemetry failures must never make a successful AI response fail.
     }
   }
+
+  async discoverLearningResources(topicInput: string) {
+    const topic = topicInput.trim().slice(0, 160);
+    if (topic.length < 2) throw new BadRequestException("Enter a learning topic with at least 2 characters.");
+
+    type VideoItem = {
+      title: string; creator: string; description: string; url: string;
+      thumbnail: string | null; provider: "YouTube"; verified: boolean;
+    };
+    type AudioItem = {
+      title: string; creator: string; description: string; url: string;
+      audioUrl: string | null; thumbnail: string | null;
+      provider: "Apple Podcasts"; verified: boolean;
+    };
+    type ProjectItem = {
+      title: string; creator: string; description: string; url: string;
+      thumbnail: null; provider: "GitHub"; verified: boolean; stars: number;
+    };
+    const safeHttpsUrl = (value: unknown): string | null => {
+      if (typeof value !== "string") return null;
+      try {
+        const url = new URL(value);
+        return url.protocol === "https:" ? url.toString() : null;
+      } catch { return null; }
+    };
+
+    const youtubeKey = this.config.get<string>("YOUTUBE_API_KEY")?.trim();
+    const [videos, podcasts, projects] = await Promise.allSettled([
+      youtubeKey
+        ? fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&safeSearch=moderate&order=relevance&maxResults=6&q=${encodeURIComponent(topic)}&key=${encodeURIComponent(youtubeKey)}`, {
+            signal: AbortSignal.timeout(9000),
+          }).then(async response => {
+            if (!response.ok) throw new Error(`YouTube API returned HTTP ${response.status}`);
+            const body = await response.json() as {
+              items?: Array<{
+                id?: { videoId?: string };
+                snippet?: { title?: string; channelTitle?: string; description?: string; thumbnails?: { medium?: { url?: string }; high?: { url?: string } } };
+              }>;
+            };
+            return (body.items ?? []).flatMap((item): VideoItem[] => {
+              const videoId = item.id?.videoId;
+              if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) return [];
+              const thumbnail = safeHttpsUrl(item.snippet?.thumbnails?.high?.url ?? item.snippet?.thumbnails?.medium?.url);
+              return [{
+                title: item.snippet?.title?.slice(0, 300) || "YouTube video",
+                creator: item.snippet?.channelTitle?.slice(0, 160) || "YouTube creator",
+                description: item.snippet?.description?.slice(0, 500) || "",
+                url: `https://www.youtube.com/watch?v=${videoId}`,
+                thumbnail,
+                provider: "YouTube",
+                verified: true,
+              }];
+            });
+          })
+        : Promise.resolve([] as VideoItem[]),
+      fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(topic)}&media=podcast&entity=podcastEpisode&limit=6`, {
+        signal: AbortSignal.timeout(9000),
+      }).then(async response => {
+        if (!response.ok) throw new Error(`Apple Podcasts search returned HTTP ${response.status}`);
+        const body = await response.json() as {
+          results?: Array<{
+            trackName?: string; collectionName?: string; artistName?: string;
+            trackViewUrl?: string; episodeUrl?: string; artworkUrl100?: string; primaryGenreName?: string;
+          }>;
+        };
+        return (body.results ?? []).flatMap((item): AudioItem[] => {
+          const url = safeHttpsUrl(item.trackViewUrl);
+          if (!url) return [];
+          return [{
+            title: item.trackName?.slice(0, 300) || item.collectionName?.slice(0, 300) || "Podcast episode",
+            creator: item.artistName?.slice(0, 160) || "Podcast publisher",
+            description: item.collectionName?.slice(0, 300) || item.primaryGenreName || "Podcast episode",
+            url,
+            audioUrl: safeHttpsUrl(item.episodeUrl),
+            thumbnail: safeHttpsUrl(item.artworkUrl100),
+            provider: "Apple Podcasts",
+            verified: true,
+          }];
+        });
+      }),
+      fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(topic + " tutorial project is:public fork:false archived:false")}&sort=stars&order=desc&per_page=10`, {
+        signal: AbortSignal.timeout(9000),
+        headers: {
+          "User-Agent": "NeuralPath-Learning-Resource-Discovery/1.0",
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      }).then(async response => {
+        if (!response.ok) throw new Error(`GitHub Search API returned HTTP ${response.status}`);
+        const body = await response.json() as {
+          items?: Array<{
+            full_name?: string; description?: string | null; html_url?: string;
+            stargazers_count?: number; language?: string | null; fork?: boolean;
+            archived?: boolean; license?: { spdx_id?: string | null } | null;
+          }>;
+        };
+        return (body.items ?? []).flatMap((item): ProjectItem[] => {
+          const url = safeHttpsUrl(item.html_url);
+          if (!url || item.fork || item.archived) return [];
+          return [{
+            title: item.full_name?.slice(0, 200) || "GitHub project",
+            creator: item.language || "Open-source project",
+            description: item.description?.slice(0, 500) || "Open-source repository; review its README before using it.",
+            url,
+            thumbnail: null,
+            provider: "GitHub",
+            verified: true,
+            stars: Math.max(0, Number(item.stargazers_count) || 0),
+          }];
+        });
+      }),
+    ]);
+
+    const videoResults = videos.status === "fulfilled" ? videos.value : [];
+    const audioResults = podcasts.status === "fulfilled" ? podcasts.value : [];
+    const projectResults = projects.status === "fulfilled" ? projects.value : [];
+    const youtubeFallback: VideoItem[] = !youtubeKey ? [{
+      title: `Search YouTube for ${topic}`,
+      creator: "YouTube search",
+      description: "Add a YouTube Data API key to show individual ranked videos and thumbnails here.",
+      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(topic)}`,
+      thumbnail: null,
+      provider: "YouTube",
+      verified: false,
+    }] : [];
+
+    return {
+      topic,
+      videos: [...videoResults, ...youtubeFallback],
+      audio: audioResults,
+      projects: projectResults,
+      availability: {
+        videos: videos.status === "rejected" ? "unavailable" : youtubeKey ? "live" : "search_link",
+        audio: podcasts.status === "fulfilled" ? "live" : "unavailable",
+        projects: projects.status === "fulfilled" ? "live" : "unavailable",
+      },
+      notices: {
+        videos: videos.status === "rejected" ? "YouTube could not be reached. Check the API key, quota, and Google Cloud API enablement." : null,
+        audio: podcasts.status === "rejected" ? "Apple Podcasts search is temporarily unavailable." : audioResults.some(item => item.audioUrl) ? null : "Podcast results link to their publisher; direct playable audio is not supplied for every episode.",
+        projects: projects.status === "rejected" ? "GitHub search may be temporarily unavailable or rate-limited. Try again later." : "Results are sorted by stars, but stars do not guarantee project quality. Check the README, license, recent activity, and security before using a repository.",
+      },
+    };
+  }
+
 }

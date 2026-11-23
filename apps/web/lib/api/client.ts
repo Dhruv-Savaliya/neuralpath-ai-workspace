@@ -126,6 +126,27 @@ export type KnowledgeSource = {
 
 export type AiConversation = { id: string; title: string; created_at: string; updated_at: string };
 
+
+export type LearningResource = {
+  title: string;
+  creator: string;
+  description: string;
+  url: string;
+  thumbnail: string | null;
+  audioUrl?: string | null;
+  provider: "YouTube" | "Apple Podcasts" | "GitHub";
+  verified: boolean;
+  stars?: number;
+};
+export type LearningResourceResults = {
+  topic: string;
+  videos: LearningResource[];
+  audio: LearningResource[];
+  projects: LearningResource[];
+  availability: { videos: "live" | "search_link" | "unavailable"; audio: "live" | "unavailable"; projects: "live" | "unavailable" };
+  notices?: { videos: string | null; audio: string | null; projects: string | null };
+};
+
 export type AiChatResponse = {
   conversation_id: string;
   answer: string;
@@ -240,6 +261,7 @@ export const neuralPathApi = {
   deleteKnowledge: (sourceId: string) =>
     request<{ deleted: boolean; chunks_deleted: number }>(`/ai/knowledge/${sourceId}`, { method: "DELETE" }),
 
+  discoverLearningResources: (topic: string) => request<LearningResourceResults>("/ai/resources/discover", { method: "POST", body: JSON.stringify({ topic }) }, 20_000),
   askAiStream: async (
     question: string, conversationId: string | undefined, onToken: (token: string) => void, signal?: AbortSignal,
   ): Promise<AiChatResponse> => {

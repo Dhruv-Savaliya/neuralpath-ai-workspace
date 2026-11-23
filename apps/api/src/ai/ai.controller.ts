@@ -9,6 +9,7 @@ import { AiService } from "./ai.service";
 import { ChatDto } from "./dto/chat.dto";
 import { IngestKnowledgeDto } from "./dto/ingest-knowledge.dto";
 import { IngestWebsiteDto } from "./dto/ingest-website.dto";
+import { DiscoverResourcesDto } from "./dto/discover-resources.dto";
 
 @Controller("ai")
 @UseGuards(SupabaseAuthGuard)
@@ -16,6 +17,12 @@ export class AiController {
   private readonly logger = new Logger(AiController.name);
 
   constructor(private readonly ai: AiService) {}
+
+  @Post("resources/discover")
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  discoverResources(@Body() dto: DiscoverResourcesDto) {
+    return this.ai.discoverLearningResources(dto.topic);
+  }
 
   @Get("knowledge")
   listKnowledge(@Req() req: AuthenticatedRequest) {

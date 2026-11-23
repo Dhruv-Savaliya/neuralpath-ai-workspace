@@ -1,8 +1,8 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, BookOpen, Bot, LoaderCircle, MessageCircle, Plus, Send, Trash2, UserRound } from "lucide-react";
-import { neuralPathApi, type AiChatResponse, type AiConversation, type KnowledgeSource } from "../../lib/api/client";
+import { AlertCircle, BookOpen, Bot, ExternalLink, LoaderCircle, MessageCircle, Plus, Search, Send, Trash2, UserRound } from "lucide-react";
+import { neuralPathApi, type AiChatResponse, type AiConversation, type KnowledgeSource, type LearningResourceResults } from "../../lib/api/client";
 import { MarkdownMessage } from "./markdown-message";
 
 type ChatMessage = {
@@ -22,6 +22,9 @@ export default function AiTutorPanel() {
   const [conversations, setConversations] = useState<AiConversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
+  const [resourceTopic, setResourceTopic] = useState("");
+  const [resourceResults, setResourceResults] = useState<LearningResourceResults | null>(null);
+  const [resourceLoading, setResourceLoading] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
@@ -135,6 +138,23 @@ export default function AiTutorPanel() {
     }
   }
 
+
+  async function discoverResources(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const topic = resourceTopic.trim();
+    if (topic.length < 2 || resourceLoading) return;
+    setResourceLoading(true);
+    setError("");
+    try {
+      const result = await neuralPathApi.discoverLearningResources(topic);
+      setResourceResults(result);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to find learning resources right now.");
+    } finally {
+      setResourceLoading(false);
+    }
+  }
+
   async function sendPrompt(promptText: string) {
     const prompt = promptText.trim();
     if (prompt.length < 2 || loading) return;
@@ -226,6 +246,24 @@ export default function AiTutorPanel() {
       {!neuralPathApi.isConfigured ? (
         <p role="alert" style={{ color: "#f59e0b" }}>The API URL is not configured for this deployment.</p>
       ) : null}
+
+
+      <section style={{ border: "1px solid var(--border,rgba(148,163,184,.2))", borderRadius: 12, padding: 14, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}><Search size={16}/><b style={{ fontSize: 14 }}>Discover learning resources</b></div>
+        <p style={{ color: "var(--muted,#9ca3af)", fontSize: 12, margin: "0 0 10px" }}>Find relevant YouTube lessons, podcasts and real open-source projects from GitHub.</p>
+        <form onSubmit={discoverResources} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input aria-label="Topic to search for learning resources" value={resourceTopic} onChange={event => setResourceTopic(event.target.value)} minLength={2} maxLength={160} required placeholder="e.g. React hooks, Python machine learning" style={{ flex: "1 1 220px", minWidth: 0, borderRadius: 9, padding: 10, background: "var(--input,rgba(15,23,42,.35))", color: "inherit", border: "1px solid var(--border,rgba(148,163,184,.25))" }}/>
+          <button className="primary-btn" type="submit" disabled={resourceLoading || resourceTopic.trim().length < 2}>{resourceLoading ? <LoaderCircle size={14}/> : <Search size={14}/>} {resourceLoading ? "Searching…" : "Find resources"}</button>
+        </form>
+        {resourceResults ? <div style={{ display: "grid", gap: 14, marginTop: 14 }}>
+          <ResourceGroup title="Videos · YouTube" items={resourceResults.videos} empty="No YouTube results returned. Configure YOUTUBE_API_KEY for ranked results."/>
+          {resourceResults.notices?.videos ? <p style={{ color: "var(--muted,#9ca3af)", fontSize: 11, margin: "-8px 0 0" }}>{resourceResults.notices.videos}</p> : null}
+          <ResourceGroup title="Audio · Podcasts" items={resourceResults.audio} empty="No matching podcast episodes were found."/>
+          {resourceResults.notices?.audio ? <p style={{ color: "var(--muted,#9ca3af)", fontSize: 11, margin: "-8px 0 0" }}>{resourceResults.notices.audio}</p> : null}
+          <ResourceGroup title="Projects · GitHub" items={resourceResults.projects} empty="No matching repositories were found."/>
+          {resourceResults.notices?.projects ? <p style={{ color: "var(--muted,#9ca3af)", fontSize: 11, margin: "-8px 0 0" }}>{resourceResults.notices.projects}</p> : null}
+        </div> : null}
+      </section>
 
       <div style={{ border: "1px solid var(--border,rgba(148,163,184,.2))", borderRadius: 12, padding: 12, marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
@@ -420,4 +458,17 @@ export default function AiTutorPanel() {
       </p>
     </section>
   );
+}
+
+function ResourceGroup({ title, items, empty }: { title: string; items: LearningResourceResults["videos"]; empty: string }) {
+  return <section>
+    <b style={{ display: "block", fontSize: 13, marginBottom: 7 }}>{title}</b>
+    {items.length ? <div style={{ display: "grid", gap: 7 }}>
+      {items.map((item, index) => <div key={item.url || index} style={{ display: "grid", gap: 6 }}><a href={item.url} target="_blank" rel="noreferrer" style={{ display: "flex", gap: 10, alignItems: "center", padding: 9, border: "1px solid var(--border,rgba(148,163,184,.16))", borderRadius: 9, color: "inherit", textDecoration: "none" }}>
+        {item.thumbnail ? <img src={item.thumbnail} alt="" loading="lazy" style={{ width: 76, height: 52, objectFit: "cover", borderRadius: 6 }}/> : null}
+        <span style={{ minWidth: 0, flex: 1 }}><b style={{ display: "block", fontSize: 12, lineHeight: 1.4 }}>{item.title}</b><small style={{ display: "block", color: "var(--muted,#9ca3af)", marginTop: 3 }}>{item.creator} · {item.provider}{item.stars ? ` · ★ ${item.stars.toLocaleString()}` : ""}</small><small style={{ display: "block", color: "var(--muted,#9ca3af)", marginTop: 2 }}>{item.description.slice(0, 180)}</small></span>
+        <ExternalLink size={14}/>
+      </a>{item.audioUrl ? <audio key={item.audioUrl} controls preload="none" src={item.audioUrl} style={{ width: "100%", height: 38 }}/> : null}</div>)}
+    </div> : <p style={{ color: "var(--muted,#9ca3af)", fontSize: 12, margin: 0 }}>{empty}</p>}
+  </section>;
 }
