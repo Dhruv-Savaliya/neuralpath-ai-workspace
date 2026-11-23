@@ -138,3 +138,37 @@ test("bootstrap generates nine validated batches and persists exactly 180 ordere
   assert.equal(result.items[0].title.startsWith("Day 1:"), true);
   assert.equal(result.items[179].title.startsWith("Day 45:"), true);
 });
+
+
+test("bootstrap returns an existing populated roadmap without regeneration or progress overwrite", async () => {
+  const savedItems = Array.from({ length: 8 }, (_, position) => ({
+    id: `item-${position}`, path_id: "existing-path", position,
+    title: `Day ${Math.floor(position / 4) + 1}: Existing task ${position + 1}`,
+    description: "Previously saved learner content",
+    status: position < 4 ? "completed" : "not_started",
+  }));
+  const existing = { id: "existing-path", title: "My existing roadmap", status: "active", items: savedItems };
+  const db = {
+    from(table) {
+      const query = {
+        select() { return this; }, eq() { return this; }, order() { return this; }, limit() { return this; },
+        maybeSingle: async () => {
+          if (table === "learning_goals") return { data: { id: "goal-existing", title: "Learn design" }, error: null };
+          if (table === "profiles") return { data: { onboarding_completed: true }, error: null };
+          if (table === "learner_preferences") return { data: null, error: null };
+          if (table === "learning_paths") return { data: existing, error: null };
+          throw new Error("Unexpected maybeSingle table: " + table);
+        },
+      };
+      return query;
+    },
+  };
+  let aiCalls = 0;
+  const service = new PathsService({ async generateForLearning() { aiCalls += 1; throw new Error("Must not regenerate"); } });
+  const result = await service.bootstrap({ user: { id: "learner-existing" }, supabase: db }, { goal_id: "goal-existing" });
+  assert.equal(aiCalls, 0);
+  assert.equal(result.id, "existing-path");
+  assert.equal(result.items.length, 8);
+  assert.equal(result.items[0].status, "completed");
+  assert.equal(result.items[0].description, "Previously saved learner content");
+});
