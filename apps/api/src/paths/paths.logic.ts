@@ -15,7 +15,7 @@ const DOMAIN_TERMS: Record<Exclude<CurriculumDomain, "other">, string[]> = {
 function scoreDomain(text: string, terms: string[]): number {
   return terms.reduce((score, term) => {
     const escaped = term.replace(/[.*+?^\${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-    const pattern = new RegExp(\`(^|[^a-z0-9])\${escaped}([^a-z0-9]|$)\`, "i");
+    const pattern = new RegExp("(^|[^a-z0-9])" + escaped + "([^a-z0-9]|$)", "i");
     return score + (pattern.test(text) ? (term.includes(" ") ? 3 : 2) : 0);
   }, 0);
 }
