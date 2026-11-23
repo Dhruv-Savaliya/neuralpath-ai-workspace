@@ -61,7 +61,7 @@ const DOMAIN_GUIDANCE: Record<CurriculumDomain, string> = {
 
 export function buildAdaptiveCurriculumPrompt(input: {
   goal: GoalLike & { current_level?: string | null; target_date?: string | null; weekly_minutes?: number | null };
-  profile: ProfileLike & { experience_level?: string | null };
+  profile: (ProfileLike & { experience_level?: string | null }) | null;
   preferences: { learning_formats: string[]; learning_pace: string; weekly_minutes: number | null; language_code: string; preferred_days: number[] };
   domain: CurriculumDomain;
   startDay: number;
@@ -72,7 +72,7 @@ export function buildAdaptiveCurriculumPrompt(input: {
   const learnerContext = JSON.stringify({
     projectDomain: domain,
     goal: { title: goal.title, category: goal.category, desiredOutcome: goal.desired_outcome, currentLevel: goal.current_level, targetDate: goal.target_date, weeklyMinutes: goal.weekly_minutes },
-    profile: { profession: profile.profession, experienceLevel: profile.experience_level, interests: profile.interests ?? [] },
+    profile: { profession: profile?.profession, experienceLevel: profile?.experience_level, interests: profile?.interests ?? [] },
     preferences: { learningFormats: preferences.learning_formats, learningPace: preferences.learning_pace, weeklyMinutes: preferences.weekly_minutes, languageCode: preferences.language_code, preferredDays: preferences.preferred_days },
   });
   return [
