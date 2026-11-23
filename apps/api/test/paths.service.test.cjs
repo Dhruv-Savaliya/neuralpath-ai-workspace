@@ -213,7 +213,7 @@ test("bootstrap resumes a valid partial roadmap from the next day without replac
   let firstRequestedDay = null;
   const ai = {
     async generateForLearning(_req, prompt) {
-      const match = prompt.match(/Generate exactly days (\\d+) through (\\d+)/);
+      const match = prompt.match(/Generate exactly days (\d+) through (\d+)/);
       const start = Number(match[1]);
       const end = Number(match[2]);
       if (firstRequestedDay === null) firstRequestedDay = start;
