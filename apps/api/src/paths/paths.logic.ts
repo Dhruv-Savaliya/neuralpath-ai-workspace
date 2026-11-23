@@ -46,7 +46,7 @@ const DOMAIN_GUIDANCE: Record<CurriculumDomain, string> = {
     "Explain relevant principles briefly, identify tools/materials, give concrete creation steps and define observable quality criteria. Do not force programming examples.",
   ].join(" "),
   business: [
-    "BUSINESS EXECUTION MODE: Teach through customer/problem research, market validation, positioning, pricing, budgeting, operations, sales/marketing and measurable experiments where relevant.",
+    "BUSINESS EXECUTION MODE: Teach through customer problems, customer/problem research, market validation, positioning, pricing, budgeting, operations, sales/marketing and measurable experiments where relevant.",
     "Give practical templates, calculations, decision criteria, outreach or execution activities and business artifacts. Do not force code examples unless the goal explicitly requires software.",
   ].join(" "),
   academic: [
@@ -76,13 +76,13 @@ export function buildAdaptiveCurriculumPrompt(input: {
     preferences: { learningFormats: preferences.learning_formats, learningPace: preferences.learning_pace, weeklyMinutes: preferences.weekly_minutes, languageCode: preferences.language_code, preferredDays: preferences.preferred_days },
   });
   return [
-    "You are NeuralPath's unified adaptive curriculum architect. Generate one coherent roadmap for the learner's actual project domain and desired outcome.",
+    "You are NeuralPath's universal learning and career curriculum architect and unified adaptive curriculum engine. Generate one coherent roadmap for the learner's actual project domain and desired outcome.",
     "The project domain controls the subject matter and teaching approach. Learning-format preferences control delivery medium only; for example, a preference for video does not make the project domain video production.",
     DOMAIN_GUIDANCE[domain],
     "Adapt explanation depth, activities, tools, examples and deliverables to the learner's current level, desired outcome, profession only when relevant, weekly time, pace and language. Do not invent qualifications or assume unprovided expertise.",
     "For each day, provide exactly one lesson, one exercise, one resource and one project task. These are four task slots, not four unrelated subjects. Keep all tasks specific to the same learning progression.",
     "The lesson teaches the day's key concept or workflow. The exercise gives concrete steps and a way to check the result. The resource names one credible book, official documentation, course, dataset, tool or precise search phrase; never invent URLs. The project defines a tangible deliverable and a measurable success criterion.",
-    "For broad but interpretable goals, start with useful fundamentals and include early activities that help the learner narrow their direction. Ask for clarification only if the goal cannot reasonably be interpreted.",
+    "Do not block broad but interpretable goals. For broad but interpretable goals, start with useful fundamentals and include early activities that help the learner narrow their direction. Ask for clarification only if the goal cannot reasonably be interpreted.",
     "Create a coherent, progressive 45-day curriculum. Avoid repeated tasks, generic filler and activities that do not contribute to the stated outcome. Allocate workload realistically to the learner's available study time and pace.",
     "Return ONLY JSON matching {days:[{day:number,title:string,focus:string,tasks:[{title:string,description:string,item_type:'lesson'|'exercise'|'resource'|'project'}]}]}. No extra fields, prose or markdown.",
     `Generate exactly days ${startDay} through ${endDay}, inclusive, in sequential order. Return exactly ${endDay - startDay + 1} day objects and exactly 4 distinct tasks per day.`,
