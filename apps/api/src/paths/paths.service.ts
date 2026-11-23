@@ -153,7 +153,7 @@ export class PathsService {
     if (!path) {
       const { data: createdPath, error: pathError } = await db.from("learning_paths").insert({
         user_id: userId, goal_id: goal.id, title: curriculum.title,
-        description: curriculum.description, status: "in_progress",
+        description: curriculum.description, status: "active",
       }).select("*").single();
       if (pathError || !createdPath) throw new InternalServerErrorException("Unable to save the generated learning path.");
       path = createdPath;
@@ -228,7 +228,7 @@ export class PathsService {
       const seenTypes = new Set<string>();
       day.tasks.forEach(task => {
         if (!task || typeof task !== "object" || typeof task.title !== "string" || !task.title.trim() ||
-            typeof task.description !== "string" || !task.description.trim() || task.title.length > 160 || task.description.length > 700 ||
+            typeof task.description !== "string" || !task.description.trim() || task.title.length > 160 || task.description.length > 900 ||
             !allowedTypes.includes(task.item_type) || seenTypes.has(task.item_type)) {
           throw new BadRequestException("AI curriculum day contains an invalid or duplicate task type.");
         }
