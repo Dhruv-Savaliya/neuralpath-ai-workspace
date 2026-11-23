@@ -172,3 +172,61 @@ test("bootstrap returns an existing populated roadmap without regeneration or pr
   assert.equal(result.items[0].status, "completed");
   assert.equal(result.items[0].description, "Previously saved learner content");
 });
+
+
+test("bootstrap resumes a valid partial roadmap from the next day without replacing saved items", async () => {
+  const existingItems = Array.from({ length: 12 }, (_, position) => ({
+    id: `saved-${position}`, path_id: "partial-path", position,
+    title: `Day ${Math.floor(position / 4) + 1}: Saved task ${position + 1}`,
+    description: "Preserve this learner task",
+    item_type: ["lesson", "exercise", "resource", "project"][position % 4],
+    status: position === 0 ? "completed" : "not_started",
+  }));
+  const existing = { id: "partial-path", title: "My learning path", status: "in_progress", items: existingItems };
+  let inserted = [];
+  let activation = null;
+  const db = {
+    from(table) {
+      const q = {
+        select() { return this; }, eq() { return this; }, order() { return this; }, limit() { return this; },
+        maybeSingle: async () => {
+          if (table === "learning_goals") return { data: { id: "goal-partial", title: "Learn video editing", category: "Video", desired_outcome: "Publish a short film", current_level: "beginner", weekly_minutes: 240 }, error: null };
+          if (table === "profiles") return { data: { onboarding_completed: true, experience_level: "beginner" }, error: null };
+          if (table === "learner_preferences") return { data: { learning_formats: ["reading"], learning_pace: "balanced", weekly_minutes: 240, language_code: "en", preferred_days: [] }, error: null };
+          if (table === "learning_paths") return { data: existing, error: null };
+          throw new Error("Unexpected maybeSingle table: " + table);
+        },
+        insert(rows) {
+          inserted = rows;
+          return { select: async () => ({ data: rows.map((row, index) => ({ ...row, id: `new-${index}` })), error: null }) };
+        },
+        update(values) {
+          return { eq() { return this; }, select() { return this; }, single: async () => {
+            activation = values;
+            return { data: { ...existing, ...values }, error: null };
+          } };
+        },
+      };
+      return q;
+    },
+  };
+  let firstRequestedDay = null;
+  const ai = {
+    async generateForLearning(_req, prompt) {
+      const match = prompt.match(/Generate exactly days (\\d+) through (\\d+)/);
+      const start = Number(match[1]);
+      const end = Number(match[2]);
+      if (firstRequestedDay === null) firstRequestedDay = start;
+      return { answer: JSON.stringify(batch(start, end - start + 1)), provider: "gemini", model: "test" };
+    },
+  };
+  const service = new PathsService(ai);
+  const result = await service.bootstrap({ user: { id: "learner-partial" }, supabase: db }, { goal_id: "goal-partial" });
+  assert.equal(firstRequestedDay, 4);
+  assert.equal(inserted.length, 168);
+  assert.equal(result.items.length, 180);
+  assert.equal(result.items[0].status, "completed");
+  assert.equal(result.items[0].description, "Preserve this learner task");
+  assert.equal(activation.status, "active");
+  assert.equal(result.generation.resumed, true);
+});
