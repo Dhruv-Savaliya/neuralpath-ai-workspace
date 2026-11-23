@@ -4,7 +4,7 @@ type GoalLike = { title?: string | null; category?: string | null; desired_outco
 type ProfileLike = { profession?: string | null; interests?: string[] | null };
 
 const DOMAIN_TERMS: Record<Exclude<CurriculumDomain, "other">, string[]> = {
-  technical: ["software", "technology", "programming", "coding", "developer", "development", "computer", "web", "app", "ai", "machine learning", "data science", "cloud", "devops", "cybersecurity", "python", "java", "javascript"],
+  technical: ["software", "technology", "programming", "coding", "developer", "computer", "web", "app", "ai", "machine learning", "data science", "cloud", "devops", "cybersecurity", "python", "java", "javascript"],
   audio: ["audio", "music", "sound", "podcast", "recording", "mixing", "mastering", "music production", "sound design", "voice over", "singing", "instrument"],
   video: ["video", "filmmaking", "film making", "cinematography", "video editing", "youtube", "videography", "short film", "documentary", "motion picture"],
   creative: ["design", "graphic design", "ui", "ux", "illustration", "drawing", "painting", "art", "photography", "writing", "creative", "branding", "animation", "fashion"],
@@ -13,7 +13,13 @@ const DOMAIN_TERMS: Record<Exclude<CurriculumDomain, "other">, string[]> = {
 };
 
 function scoreDomain(text: string, terms: string[]): number {
+  return terms.reduce((score, term) => {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\function scoreDomain(text: string, terms: string[]): number {
   return terms.reduce((score, term) => score + (text.includes(term) ? (term.includes(" ") ? 3 : 2) : 0), 0);
+}").replace(/\\s+/g, "\\\\s+");
+    const pattern = new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+    return score + (pattern.test(text) ? (term.includes(" ") ? 3 : 2) : 0);
+  }, 0);
 }
 
 /** Classifies the work being learned; learning-format preferences are deliberately excluded. */
