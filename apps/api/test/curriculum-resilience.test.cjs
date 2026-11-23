@@ -24,9 +24,11 @@ function createMockBatch(startDay = 1, count = 3) {
 test("resilience (a): Groq token-limit error triggers fallback and retry succeeds", async () => {
   let batchCalls = 0;
   let firstAttemptFailed = false;
+  let firstPrompt = "";
 
   const aiMock = {
     async generateForLearning(_req, prompt, options) {
+      if (!firstPrompt) firstPrompt = prompt;
       batchCalls += 1;
       const match = prompt.match(/Generate exactly days (\d+) through (\d+)/);
       const start = match ? parseInt(match[1], 10) : 1;
@@ -76,6 +78,8 @@ test("resilience (a): Groq token-limit error triggers fallback and retry succeed
   assert.equal(firstAttemptFailed, true);
   // 15 batches with 1 failure on batch 1 means 16 calls total
   assert.equal(batchCalls, 16);
+  assert.match(firstPrompt, /TECHNICAL TEACHING MODE/);
+  assert.match(firstPrompt, /project domain controls the subject matter/);
 });
 
 // (b) invalid JSON then repair/retry succeeds
