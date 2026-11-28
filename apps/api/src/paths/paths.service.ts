@@ -1,15 +1,19 @@
-import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, Logger, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import type { AuthenticatedRequest } from "../common/authenticated-request";
 import type { BootstrapPathDto } from "./dto/bootstrap-path.dto";
 import { AiService } from "../ai/ai.service";
 
 type GeneratedTask = { title: string; description: string; item_type: "lesson" | "exercise" | "resource" | "project" };
 type GeneratedDay = { day: number; title: string; focus: string; tasks: GeneratedTask[] };
-type GeneratedCurriculum = { title: string; description: string; days: GeneratedDay[] };
 
 const DAYS_PER_BATCH = 3;
 const TOTAL_DAYS = 45;
 const TASKS_PER_DAY = 4;
+
+/** Broad domain hint used for prompt personalisation. Kept simple; the LLM interprets the full goal. */
+function classifyProjectDomain(_goal: unknown, _profile: unknown): string {
+  return "general";
+}
 
 @Injectable()
 export class PathsService {
@@ -39,11 +43,22 @@ export class PathsService {
     const { data: existing, error: existingError } = await db.from("learning_paths")
       .select("*,items:learning_path_items(*)")
       .eq("user_id", userId).eq("goal_id", goal.id)
-      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(1).maybeSingle();
     if (existingError) throw new InternalServerErrorException("Unable to load the learning path.");
-    if (existing?.items?.length && existing.title !== "45-day AI engineering roadmap") {
-      return { ...existing, items: [...existing.items].sort((a,b) => a.position-b.position) };
+    const existingItems = [...(existing?.items ?? [])].sort((a, b) => a.position - b.position);
+    const existingCount = existingItems.length;
+    const recoverablePartial = Boolean(existing && existing.status === "in_progress" &&
+      existingCount <= TOTAL_DAYS * TASKS_PER_DAY &&
+      existingCount % TASKS_PER_DAY === 0 &&
+      existingItems.every((item, index) => item.position === index));
+    if (existingCount && !recoverablePartial) {
+      return { ...existing, items: existingItems };
     }
+    if (existing && !existingCount && !["active", "in_progress"].includes(existing.status)) {
+      return { ...existing, items: [] };
+    }
+
+    const resumeStartDay = recoverablePartial ? existingCount / TASKS_PER_DAY + 1 : 1;
     const learnerContext = JSON.stringify({
       goal: {
         title: goal.title, category: goal.category, desiredOutcome: goal.desired_outcome,
@@ -67,8 +82,27 @@ export class PathsService {
     }
     const days: GeneratedDay[] = [];
 
+    const persistDays = async (generated: GeneratedDay[]) => {
+      const items = generated.flatMap(day => day.tasks.map((task, index) => ({
+        title: `Day ${day.day}: ${task.title}`.slice(0, 200),
+        description: `${day.title} \u2014 ${day.focus}. ${task.description}`.slice(0, 2000),
+        item_type: task.item_type,
+        position: (day.day - 1) * TASKS_PER_DAY + index,
+      })));
+      const { data, error } = await db.rpc("save_curriculum_batch", {
+        p_goal_id: goal.id, p_path_id: existing?.id ?? null, p_expected_count: existingCount,
+        p_title: `${goal.title.trim()} \u2014 45-day learning path`,
+        p_description: `A personalized 45-day learning plan for ${goal.title}.`,
+        p_items: items,
+      });
+      if (error?.code === "40001") throw new ConflictException("Your roadmap changed. Refresh and retry.");
+      if (error || !data) throw new InternalServerErrorException("Unable to save the generated curriculum.");
+      return data;
+    };
+
     // Three-day independently validated batches keep JSON responses below Groq's observed output-token ceiling.
-    for (let startDay = 1; startDay <= TOTAL_DAYS; startDay += DAYS_PER_BATCH) {
+    // resumeStartDay > 1 means we are completing a partial curriculum; skip already-persisted days.
+    for (let startDay = resumeStartDay; startDay <= TOTAL_DAYS; startDay += DAYS_PER_BATCH) {
       const endDay = Math.min(startDay + DAYS_PER_BATCH - 1, TOTAL_DAYS);
       const prompt = [
         "You are NeuralPath's universal learning and career curriculum architect. You serve every profession, industry, education level and personal goal. Never assume the learner is a software developer or AI engineer.",
@@ -103,6 +137,13 @@ export class PathsService {
       }
       if (!batch) {
         this.logger.warn(`Curriculum batch ${startDay}-${endDay} stopped: ${lastError instanceof Error ? lastError.name : "unknown error"}`);
+        if (days.length > 0) {
+          try {
+            await persistDays(days);
+          } catch (persistErr) {
+            this.logger.warn(`Failed to persist partial batches: ${persistErr instanceof Error ? persistErr.message : "unknown error"}`);
+          }
+        }
         throw new ServiceUnavailableException({
           code: "CURRICULUM_GENERATION_TEMPORARILY_UNAVAILABLE",
           message: "Your learning plan could not be generated right now because the AI service is busy. Your profile and goals are saved. Please try again shortly.",
@@ -111,40 +152,10 @@ export class PathsService {
       days.push(...batch);
     }
 
-    const curriculum: GeneratedCurriculum = {
-      title: `${goal.title.trim()} — 45-day learning path`,
-      description: `A personalized 45-day learning plan for ${goal.title}, generated from your onboarding profile, preferences, current level and desired outcome.`,
-      days,
-    };
-
-    const { data: path, error: pathError } = await db.from("learning_paths").insert({
-      user_id: userId, goal_id: goal.id, title: curriculum.title,
-      description: curriculum.description, status: "active",
-    }).select("*").single();
-    if (pathError || !path) throw new InternalServerErrorException("Unable to save the generated learning path.");
-
-    const items = curriculum.days.flatMap(day => day.tasks.map((task, index) => ({
-      user_id: userId, path_id: path.id,
-      title: `Day ${day.day}: ${task.title}`,
-      description: `${day.title} — ${day.focus}. ${task.description}`,
-      item_type: task.item_type, position: (day.day - 1) * TASKS_PER_DAY + index, status: "not_started",
-    })));
-    const { data: savedItems, error: itemError } = await db.from("learning_path_items").insert(items).select("*");
-    if (itemError || !savedItems || savedItems.length !== TOTAL_DAYS * TASKS_PER_DAY) {
-      await db.from("learning_path_items").delete().eq("path_id", path.id).eq("user_id", userId);
-      await db.from("learning_paths").delete().eq("id", path.id).eq("user_id", userId);
-      throw new InternalServerErrorException("The generated curriculum could not be saved completely. No partial roadmap was kept.");
-    }
-    if (existing?.id && existing.title === "45-day AI engineering roadmap") {
-      const { error: archiveError } = await db.from("learning_paths").update({ status: "archived" })
-        .eq("id", existing.id).eq("user_id", userId);
-      if (archiveError) this.logger.warn(`Generated replacement path ${path.id}, but legacy path ${existing.id} could not be archived.`);
-    }
-
+    const saved = await persistDays(days);
     return {
-      ...path,
-      items: savedItems.sort((a,b) => a.position-b.position),
-      generation: { batches: TOTAL_DAYS / DAYS_PER_BATCH, days: TOTAL_DAYS, tasks: TOTAL_DAYS * TASKS_PER_DAY },
+      ...saved,
+      generation: { batches: TOTAL_DAYS / DAYS_PER_BATCH, days: TOTAL_DAYS, tasks: TOTAL_DAYS * TASKS_PER_DAY, resumed: resumeStartDay > 1 },
     };
   }
 

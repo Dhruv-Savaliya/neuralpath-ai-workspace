@@ -1,3 +1,4 @@
+import SubmitButton from "../../components/submit-button";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { updatePassword } from "../../actions/auth";
@@ -22,7 +23,7 @@ export default async function UpdatePassword({ searchParams }: { searchParams: P
     {error ? <div className="auth-error" role="alert">{messages[error] ?? "Your recovery session may have expired. Request a new link."}</div> : null}
     <form action={updatePassword} className="auth-form">
       <label>New password <input name="password" type="password" autoComplete="new-password" required minLength={8} maxLength={128} placeholder="At least 8 characters"/></label>
-      <button className="site-button" type="submit">Update password ↗</button>
+      <SubmitButton>Update password ↗</SubmitButton>
     </form>
   </section></main>;
 }

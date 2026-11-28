@@ -22,9 +22,9 @@ export class ProgressService {
         user_id: userId,
         path_item_id: dto.path_item_id,
         status: dto.status,
-        reflection: dto.reflection?.trim() ?? "",
+        ...(typeof dto.reflection === "string" ? { reflection: dto.reflection.trim() } : {}),
         completed_at: completed ? new Date().toISOString() : null,
-      }, { onConflict: "user_id,path_item_id" })
+      }, { onConflict: "user_id,path_item_id", defaultToNull: false })
       .select("*")
       .single();
     if (error || !data) throw new InternalServerErrorException("Unable to save learning progress.");

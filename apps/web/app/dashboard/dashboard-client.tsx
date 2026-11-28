@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import WorkspaceGoalsPanel from "./workspace-goals";
 import WorkspaceProfilePanel from "./workspace-profile";
-import AiTutorPanel from "./ai-tutor-panel";
+import dynamic from "next/dynamic";
 import LearnerInsightsPanel from "./learner-insights-panel";
 import {
   neuralPathApi,
@@ -22,6 +22,10 @@ import {
   type LearnerInsights,
   type WorkspaceDashboard,
 } from "../../lib/api/client";
+
+const AiTutorPanel = dynamic(() => import("./ai-tutor-panel"), {
+  loading: () => <p role="status">Loading AI tutor...</p>,
+});
 
 type Tab = "overview" | "roadmap" | "insights" | "goals" | "profile" | "achievements" | "ai";
 type DashboardSearchResult =
@@ -40,7 +44,7 @@ const navItems: Array<{ id: Tab; label: string; icon: typeof LayoutDashboard }> 
 const phaseTones = ["violet", "blue", "cyan", "pink", "orange", "green", "gold"];
 
 function isDone(item: ApiPathItem) {
-  return item.progress === "completed" || item.status === "completed";
+  return (item.progress ?? item.status) === "completed";
 }
 
 function getDay(item: ApiPathItem) {
@@ -81,6 +85,8 @@ function formatDate() {
 
 export default function Home() {
   const [dashboard, setDashboard] = useState<WorkspaceDashboard | null>(null);
+  const [insightsState, setInsightsState] = useState<"loading" | "ready" | "error">("loading");
+  const insightsRequest = useRef<symbol | null>(null);
   const [insights, setInsights] = useState<LearnerInsights | null>(null);
   const [selectedPathId, setSelectedPathId] = useState("");
   const [tab, setTab] = useState<Tab>("overview");
@@ -96,6 +102,21 @@ export default function Home() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const reduceMotion = useReducedMotion();
 
+  const loadInsights = useCallback(async () => {
+    const request = Symbol();
+    insightsRequest.current = request;
+    setInsightsState("loading");
+    try {
+      const next = await neuralPathApi.getLearnerInsights();
+      if (request === insightsRequest.current) {
+        setInsights(next);
+        setInsightsState("ready");
+      }
+    } catch {
+      if (request === insightsRequest.current) setInsightsState("error");
+    }
+  }, []);
+
   const refresh = useCallback(async () => {
     const next = await neuralPathApi.getDashboard();
     setDashboard(next);
@@ -105,22 +126,15 @@ export default function Home() {
         ?? next.paths[0];
       return selected?.id ?? "";
     });
-    try {
-      setInsights(await neuralPathApi.getLearnerInsights());
-    } catch {
-      setInsights(null);
-    }
-  }, []);
+    void loadInsights();
+  }, [loadInsights]);
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([
-      neuralPathApi.getDashboard(),
-      neuralPathApi.getLearnerInsights().catch(() => null),
-    ]).then(([data, nextInsights]) => {
+    void loadInsights();
+    neuralPathApi.getDashboard().then(data => {
       if (!mounted) return;
       setDashboard(data);
-      setInsights(nextInsights);
       const selected = data.paths.find(path => path.status === "active") ?? data.paths[0];
       setSelectedPathId(selected?.id ?? "");
     }).catch(cause => {
@@ -128,8 +142,8 @@ export default function Home() {
     }).finally(() => {
       if (mounted) setLoading(false);
     });
-    return () => { mounted = false; };
-  }, []);
+    return () => { mounted = false; insightsRequest.current = null; };
+  }, [loadInsights]);
 
   useEffect(() => {
     function handleSearchShortcut(event: KeyboardEvent) {
@@ -254,7 +268,7 @@ export default function Home() {
         <nav className="np-nav" aria-label="Main navigation">
           {navItems.map(item => {
             const Icon = item.icon;
-            return <button key={item.id} className={`np-nav-link ${tab === item.id ? "active" : ""}`} onClick={() => changeTab(item.id)}>
+            return <button key={item.id} aria-current={tab === item.id ? "page" : undefined} className={`np-nav-link ${tab === item.id ? "active" : ""}`} onClick={() => changeTab(item.id)}>
               <Icon size={17}/><span>{item.label}</span>
               {item.id === "goals" && dashboard?.goals.length ? <small>{dashboard.goals.length}</small> : null}
             </button>;
@@ -339,15 +353,15 @@ export default function Home() {
                 <div className="np-hero-grid"/>
                 <div className="np-hero-copy">
                   <div className="np-hero-kicker"><Sparkles size={14}/> YOUR NEXT STEP</div>
-                  <h2>{nextTask ? nextTask.title.replace(/^Day\s+\d+\s*:\s*/i, "") : selectedPath ? "Your path is complete. Celebrate your progress." : "Start with a goal that matters to you."}</h2>
-                  <p>{nextTask ? nextTask.description : selectedPath ? "You have completed every saved task in this learning path." : "NeuralPath will turn your ambition into a practical, personalized learning journey."}</p>
+                  <h2>{nextTask ? nextTask.title.replace(/^Day\s+\d+\s*:\s*/i, "") : selectedPath && !items.length ? "Your roadmap has no tasks yet." : selectedPath ? "Your path is complete. Celebrate your progress." : "Start with a goal that matters to you."}</h2>
+                  <p>{nextTask ? nextTask.description : selectedPath && !items.length ? "Open learning goals to check your roadmap." : selectedPath ? "You have completed every saved task in this learning path." : "NeuralPath will turn your ambition into a practical, personalized learning journey."}</p>
                   <div className="np-hero-meta">
                     {selectedPath ? <span><BookOpen size={14}/>{selectedPath.title}</span> : <span><Target size={14}/>{dashboard?.goals.length ?? 0} saved goals</span>}
                     {nextTask ? <span><CalendarDays size={14}/>Day {getDay(nextTask)}</span> : null}
                     {nextTask ? <span><Circle size={12}/>Not started</span> : null}
                   </div>
-                  <button className="np-primary" onClick={() => selectedPath ? (setActiveDay(nextTask ? getDay(nextTask) : 1), changeTab("roadmap")) : changeTab("goals")}>
-                    {selectedPath ? "Continue learning" : "Create your first goal"} <ArrowUpRight size={16}/>
+                  <button className="np-primary" onClick={() => selectedPath && items.length ? (setActiveDay(nextTask ? getDay(nextTask) : 1), changeTab("roadmap")) : changeTab("goals")}>
+                    {items.length ? (nextTask ? "Continue learning" : "Review learning path") : dashboard.goals.length ? "Manage learning goals" : "Create your first goal"} <ArrowUpRight size={16}/>
                   </button>
                 </div>
                 <div className="np-hero-art" aria-hidden="true"><div className="np-orbit one"/><div className="np-orbit two"/><div className="np-orb-core"><BrainCircuit size={47}/></div><span className="np-float f1"><Target size={13}/> FOCUS</span><span className="np-float f2"><Sparkles size={13}/> GROW</span><span className="np-hero-star">✦</span></div>
@@ -367,7 +381,7 @@ export default function Home() {
               <div className="np-dashboard-grid">
                 <section className="np-panel np-activity-panel">
                   <div className="np-panel-head"><div><small>YOUR CONSISTENCY</small><h3>Learning activity</h3></div><span className="np-source-tag"><Activity size={13}/> Live data</span></div>
-                  {weekly.length ? <div className="np-chart" aria-label="Weekly completed learning tasks">
+                  {insightsState === "error" ? <p role="status">Weekly activity could not be refreshed. <button className="text-btn" onClick={() => void loadInsights()}>Retry</button></p> : insightsState === "loading" && !insights ? <p role="status">Loading weekly activity...</p> : weekly.length ? <div className="np-chart" aria-label="Weekly completed learning tasks">
                     {weekly.map(week => <div className="np-chart-col" key={week.weekStart} title={`${week.completedTasks} completed tasks`}>
                       <div className="np-chart-bar-wrap"><i style={{ height: `${Math.max(5, week.completedTasks / weeklyMax * 100)}%` }}/></div>
                       <b>{week.completedTasks}</b><small>{new Date(week.weekStart + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</small>
@@ -380,7 +394,7 @@ export default function Home() {
                     <div className="np-progress-title"><b>{selectedPath.title}</b><strong>{progress}%</strong></div>
                     <div className="np-progress-track large"><i style={{ width: `${progress}%` }}/></div>
                     <div className="np-progress-foot"><span>{completed} of {items.length} tasks completed</span><span>{items.length - completed} remaining</span></div>
-                    <div className="np-next-task"><span className="np-next-icon"><Rocket size={17}/></span><div><small>NEXT UP</small><b>{nextTask?.title ?? "All tasks completed"}</b><span>{nextTask ? `Day ${getDay(nextTask)} · Continue your learning path` : "Excellent work — your path is complete."}</span></div></div>
+                    <div className="np-next-task"><span className="np-next-icon"><Rocket size={17}/></span><div><small>NEXT UP</small><b>{nextTask?.title ?? (items.length ? "All tasks completed" : "No tasks yet")}</b><span>{nextTask ? `Day ${getDay(nextTask)} · Continue your learning path` : !items.length ? "Check your learning goals for next steps." : "Excellent work — your path is complete."}</span></div></div>
                   </> : <div className="np-empty-state"><BookOpen size={23}/><b>No learning path yet</b><span>Create a goal and generate your personalized curriculum.</span><button className="np-primary small" onClick={() => changeTab("goals")}>Explore goals <ArrowRight size={14}/></button></div>}
                 </section>
               </div>
@@ -425,8 +439,8 @@ export default function Home() {
                   <section className="np-panel np-day-detail">
                     <div className="np-day-head"><div><small>DAY {String(activeDay).padStart(2, "0")} · {phases.find(phase => activeDay >= phase.firstDay && activeDay <= phase.lastDay)?.name}</small><h2>{dayItems[0]?.title.replace(/^Day\s+\d+\s*:\s*/i, "") || `Day ${activeDay}`}</h2><p>{dayItems[0]?.description || "Your saved learning tasks for this day."}</p></div><span className={dayItems.length && dayItems.every(isDone) ? "done" : ""}>{dayItems.length && dayItems.every(isDone) ? "Completed" : "In progress"}</span></div>
                     <div className="np-task-list">{dayItems.length ? dayItems.map((item, index) => <article className={`np-task ${isDone(item) ? "completed" : ""}`} key={item.id}>
-                      <button disabled={savingItem === item.id} aria-label={isDone(item) ? "Mark task incomplete" : "Mark task complete"} onClick={() => void toggle(item)}>{savingItem === item.id ? <LoaderCircle size={16} className="np-spin"/> : isDone(item) ? <CheckCircle2 size={18}/> : <Circle size={18}/>}</button>
-                      <div><small>{(item as ApiPathItem & { item_type?: string }).item_type?.replaceAll("_", " ") || `TASK ${index + 1}`}</small><b>{item.title.replace(/^Day\s+\d+\s*:\s*/i, "")}</b><p>{item.description}</p></div>
+                      <button disabled={Boolean(savingItem)} aria-label={isDone(item) ? "Mark task incomplete" : "Mark task complete"} onClick={() => void toggle(item)}>{savingItem === item.id ? <LoaderCircle size={16} className="np-spin"/> : isDone(item) ? <CheckCircle2 size={18}/> : <Circle size={18}/>}</button>
+                      <div><small>{item.item_type?.replaceAll("_", " ") || `TASK ${index + 1}`}</small><b>{item.title.replace(/^Day\s+\d+\s*:\s*/i, "")}</b><p>{item.description}</p></div>
                     </article>) : <div className="np-empty-state compact"><BookOpen size={22}/><b>No tasks for this day</b><span>Choose another day from your curriculum, or refresh your learning path.</span><button className="np-text-action" onClick={() => void handleRefresh()} disabled={refreshing}>Refresh path <RefreshCw size={13}/></button></div>}</div>
                     <div className="np-day-footer"><button className="np-secondary" disabled={!days.length || activeDay <= Math.min(...days)} onClick={() => setActiveDay(day => Math.max(Math.min(...days), day - 1))}><ChevronLeft size={15}/> Previous</button><span>{dayItems.filter(isDone).length}/{dayItems.length} tasks complete</span><button className="np-primary small" disabled={!days.length || activeDay >= Math.max(...days)} onClick={() => setActiveDay(day => Math.min(Math.max(...days), day + 1))}>Next day <ChevronRight size={15}/></button></div>
                   </section>
@@ -436,8 +450,8 @@ export default function Home() {
           ) : null}
 
           {tab === "insights" ? <section className="np-page-section"><PageHeading eyebrow="YOUR LEARNING INTELLIGENCE" title="Learning insights" subtitle="Progress, consistency and adaptive recommendations grounded in your saved learning activity."/><LearnerInsightsPanel/></section> : null}
-          {tab === "goals" ? <section className="np-page-section"><PageHeading eyebrow="YOUR DIRECTION" title="Learning goals" subtitle="Manage your ambitions and create a roadmap for each goal."/><WorkspaceGoalsPanel/></section> : null}
-          {tab === "profile" ? <section className="np-page-section"><PageHeading eyebrow="YOUR LEARNING IDENTITY" title="Personalize your workspace" subtitle="Keep your learner profile current so your roadmap stays relevant."/><WorkspaceProfilePanel/></section> : null}
+          {tab === "goals" ? <section className="np-page-section"><PageHeading eyebrow="YOUR DIRECTION" title="Learning goals" subtitle="Manage your ambitions and create a roadmap for each goal."/><WorkspaceGoalsPanel data={dashboard} refresh={refresh} openProfile={() => changeTab("profile")} openPath={id => { setSelectedPathId(id); setActiveDay(1); changeTab("roadmap"); }}/></section> : null}
+          {tab === "profile" ? <section className="np-page-section"><PageHeading eyebrow="YOUR LEARNING IDENTITY" title="Personalize your workspace" subtitle="Keep your learner profile current so your roadmap stays relevant."/>{dashboard.profile ? <WorkspaceProfilePanel profile={dashboard.profile} onSaved={profile => setDashboard(current => current && ({ ...current, profile }))}/> : <p role="alert">Your profile is unavailable. Refresh your workspace to try again.</p>}</section> : null}
           {tab === "achievements" ? <section className="np-page-section"><PageHeading eyebrow="MILESTONES · EXPERIENCE · MOMENTUM" title="Your achievements" subtitle="A record of the progress saved to your account — no sample activity or browser-only XP."/><AchievementsPanel xp={stats?.xp ?? 0} completedTasks={stats?.completedItems ?? 0} completedDays={stats?.completedDays ?? 0} totalPaths={stats?.totalPaths ?? 0}/></section> : null}
           {tab === "ai" ? <section className="np-page-section"><PageHeading eyebrow="YOUR PERSONAL LEARNING ASSISTANT" title="AI tutor" subtitle="Ask questions grounded in your own learning notes and saved material."/><AiTutorPanel/></section> : null}
 

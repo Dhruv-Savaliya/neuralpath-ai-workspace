@@ -48,15 +48,20 @@ export default function AiTutorPanel() {
 
   useEffect(() => { void loadConversations(); }, [loadConversations]);
 
+  const [openingConversation, setOpeningConversation] = useState(false);
+  useEffect(() => () => abortControllerRef.current?.abort(), []);
+
   async function openConversation(id: string) {
-    if (loading) return;
+    if (loading || openingConversation) return;
     if (!id) { setActiveConversationId(null); setMessages([]); setQuestion(""); setError(""); return; }
     setError("");
     try {
+      setOpeningConversation(true);
       const result = await neuralPathApi.getAiConversation(id);
       setActiveConversationId(id);
       setMessages(result.messages.map(message => ({ id: message.id, role: message.role, text: message.content, sources: message.sources ?? [] })));
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to open this conversation."); }
+    finally { setOpeningConversation(false); }
   }
 
   async function addSource(event: FormEvent<HTMLFormElement>) {
@@ -167,14 +172,15 @@ export default function AiTutorPanel() {
             <b style={{ fontSize: 13 }}>Recent conversations</b>
             <span style={{ color: "var(--muted,#9ca3af)", fontSize: 11 }}>{conversations.length}/30</span>
           </div>
-          <button type="button" className="text-btn" onClick={() => void openConversation("")} disabled={loading} aria-label="Start a new conversation">
+          <button type="button" className="text-btn" onClick={() => void openConversation("")} disabled={loading || openingConversation} aria-label="Start a new conversation">
             <Plus size={14}/> New chat
           </button>
         </div>
+        {openingConversation && <p role="status">Loading conversation...</p>}
         {conversations.length ? (
           <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
             {conversations.map(conversation => (
-              <button key={conversation.id} type="button" onClick={() => void openConversation(conversation.id)} disabled={loading}
+              <button key={conversation.id} type="button" onClick={() => void openConversation(conversation.id)} disabled={loading || openingConversation}
                 aria-pressed={activeConversationId === conversation.id}
                 style={{
                   flex: "0 0 auto", minWidth: 150, maxWidth: 230, textAlign: "left", padding: "9px 11px",
@@ -258,7 +264,7 @@ export default function AiTutorPanel() {
               placeholder="Ask about a topic, concept, or your uploaded notes…" rows={3} required
               style={{ width: "100%", resize: "vertical", borderRadius: 10, padding: 12, background: "var(--input,rgba(15,23,42,.35))", color: "inherit", border: "1px solid var(--border,rgba(148,163,184,.25))" }}/>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button className="primary-btn" type="submit" disabled={loading || question.trim().length < 2}>
+            <button className="primary-btn" type="submit" disabled={loading || openingConversation || question.trim().length < 2}>
               {loading ? <LoaderCircle size={15}/> : <Send size={15}/>} {loading ? "Generating…" : "Ask NeuralPath"}
             </button>
             {loading ? <button className="text-btn" type="button" onClick={() => abortControllerRef.current?.abort()}>Stop generating</button> : null}
@@ -318,3 +324,4 @@ export default function AiTutorPanel() {
     </section>
   );
 }
+

@@ -1,4 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Post, Req, Res, UseGuards, Logger } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Req, Res, UseGuards, UseInterceptors, UploadedFile, BadRequestException, HttpException, Logger } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { memoryStorage } from "multer";
 import type { Response } from "express";
 import { Throttle } from "@nestjs/throttler";
 import type { AuthenticatedRequest } from "../common/authenticated-request";
@@ -26,6 +28,21 @@ export class AiController {
     return this.ai.ingestWebsite(req, dto);
   }
 
+  @Post("knowledge/document")
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @UseInterceptors(FileInterceptor("file", {
+    storage: memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 1, fieldSize: 1024, parts: 3 },
+  }))
+  ingestDocument(
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() file: Express.Multer.File,
+    @Body("title") title?: string,
+  ) {
+    if (!file) throw new BadRequestException("A valid PDF or DOCX file is required.");
+    return this.ai.ingestDocument(req, file, title);
+  }
+
   @Post("knowledge")
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   ingest(@Req() req: AuthenticatedRequest, @Body() dto: IngestKnowledgeDto) {
@@ -47,7 +64,6 @@ export class AiController {
   getConversation(@Req() req: AuthenticatedRequest, @Param("conversationId") conversationId: string) {
     return this.ai.getConversation(req, conversationId);
   }
-
 
   @Post("chat/stream")
   @Throttle({ default: { limit: 10, ttl: 60000 } })
@@ -72,7 +88,8 @@ export class AiController {
         this.logger.warn("AI Tutor stream ended before completion.");
         const message = error instanceof Error && /budget|quota/i.test(error.message)
           ? error.message : "NeuralPath could not complete this answer. Please try again.";
-        send("error", { message });
+        const code = error instanceof HttpException && error.getStatus() === 429 ? "QUOTA_EXCEEDED" : "STREAM_INTERRUPTED";
+        send("error", { code, message, retryable: true });
       }
     } finally { if (!res.writableEnded) res.end(); }
   }

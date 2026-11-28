@@ -202,7 +202,7 @@ export default function LearnerInsightsPanel() {
               <Target size={15}/> Adaptive recommendations
             </b>
             <small style={{ display: "block", color: "var(--muted,#9ca3af)", margin: "4px 0 10px" }}>
-              {recommendations?.source !== "deterministic" ? "AI-ranked using your saved learning context." : "Grounded suggestions from your saved roadmap. AI may be unavailable."}
+              {!recommendations ? "" : recommendations.source !== "deterministic" ? "AI-ranked using your saved learning context." : "Grounded suggestions from your saved roadmap. AI may be unavailable."}
             </small>
             {recommendations?.recommendations?.length ? recommendations.recommendations.map(item => (
               <div key={item.candidateId} style={{ border: "1px solid var(--border,rgba(148,163,184,.18))", borderRadius: 10, padding: 12, marginTop: 8 }}>
@@ -210,9 +210,9 @@ export default function LearnerInsightsPanel() {
                 <p style={{ color: "var(--muted,#9ca3af)", fontSize: 12, margin: "5px 0 10px" }}>{item.reason}</p>
                 <small style={{ color: "var(--muted,#9ca3af)" }}>About {item.estimatedMinutes} min · Priority {item.priority}</small>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 10 }}>
-                  <button className="text-btn" type="button" disabled={recommendationBusy} onClick={() => void respondToRecommendation(item.candidateId, "accept")}>Accept</button>
-                  <button className="text-btn" type="button" disabled={recommendationBusy} onClick={() => void respondToRecommendation(item.candidateId, "helpful")}>Helpful</button>
-                  <button className="text-btn" type="button" disabled={recommendationBusy} onClick={() => void respondToRecommendation(item.candidateId, "dismissed")}>Dismiss</button>
+                  <button className="text-btn" type="button" disabled={recommendationBusy || !recommendations.id} onClick={() => void respondToRecommendation(item.candidateId, "accept")}>Accept</button>
+                  <button className="text-btn" type="button" disabled={recommendationBusy || !recommendations.id} onClick={() => void respondToRecommendation(item.candidateId, "helpful")}>Helpful</button>
+                  <button className="text-btn" type="button" disabled={recommendationBusy || !recommendations.id} onClick={() => void respondToRecommendation(item.candidateId, "dismissed")}>Dismiss</button>
                 </div>
               </div>
             )) : <p style={{ color: "var(--muted,#9ca3af)", fontSize: 12 }}>{recommendations?.message ?? "No recommendations available yet."}</p>}

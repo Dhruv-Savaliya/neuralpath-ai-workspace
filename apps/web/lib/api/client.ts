@@ -9,6 +9,7 @@ export type ApiPathItem = {
   path_id: string;
   title: string;
   description: string;
+  item_type?: string;
   position: number;
   status: string;
   progress?: string;
@@ -196,9 +197,8 @@ export const neuralPathApi = {
   sendRecommendationFeedback: (id: string, candidateId: string, feedback: "helpful" | "dismissed") => request<{ saved: boolean }>(`/learning/recommendations/${id}/feedback`, { method: "POST", body: JSON.stringify({ candidateId, feedback }) }),
   acceptLearningRecommendation: (id: string, candidateId: string) => request<{ accepted: boolean }>(`/learning/recommendations/${id}/accept`, { method: "POST", body: JSON.stringify({ candidateId }) }),
   getGoals: () => request<ApiGoal[]>("/goals"),
-  getProfile: () => request<{ id: string; display_name: string; profession: string; experience_level: string; interests: string[]; timezone: string }>("/profile"),
   updateProfile: (input: { display_name?: string; profession?: string; experience_level?: string; interests?: string[]; timezone?: string }) =>
-    request("/profile", { method: "PATCH", body: JSON.stringify(input) }),
+    request<NonNullable<WorkspaceDashboard["profile"]>>("/profile", { method: "PATCH", body: JSON.stringify(input) }),
   createGoal: (input: { title: string; category?: string; desired_outcome?: string; current_level?: string; target_date?: string; weekly_minutes?: number }) =>
     request<ApiGoal>("/goals", { method: "POST", body: JSON.stringify(input) }),
   updateGoal: (id: string, input: Partial<Pick<ApiGoal, "title" | "category" | "desired_outcome" | "current_level" | "target_date" | "status">>) =>
@@ -214,6 +214,29 @@ export const neuralPathApi = {
     request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge", { method: "POST", body: JSON.stringify(input) }),
   ingestWebsite: (input: { url: string; title?: string }) =>
     request<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>("/ai/knowledge/website", { method: "POST", body: JSON.stringify(input) }),
+  ingestDocument: async (file: File, title?: string) => {
+    if (!baseUrl) throw new Error("NeuralPath is not connected to its learning service. Please try again later.");
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (error || !token) throw new Error("Your session has expired. Please sign in again.");
+    const formData = new FormData();
+    formData.append("file", file);
+    if (title) formData.append("title", title);
+    const response = await fetch(`${baseUrl}/api/v1/ai/knowledge/document`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!response.ok) {
+      const raw = await response.text();
+      let message = "Document upload failed. Please try again.";
+      try { message = (JSON.parse(raw) as { message?: string }).message ?? message; } catch { /* ignore */ }
+      throw new Error(message);
+    }
+    return response.json() as Promise<{ source_id: string; source_title: string; chunks_created: number; embedding_model: string; dimensions: number }>;
+  },
   deleteKnowledge: (sourceId: string) =>
     request<{ deleted: boolean; chunks_deleted: number }>(`/ai/knowledge/${sourceId}`, { method: "DELETE" }),
 

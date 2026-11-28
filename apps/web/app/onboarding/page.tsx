@@ -1,3 +1,4 @@
+import SubmitButton from "../components/submit-button";
 import type { Metadata } from "next";
 /* eslint-disable react/no-unescaped-entities */
 import { redirect } from "next/navigation";
@@ -46,7 +47,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/sign-in");
 
-  const [{ data: profile }, { data: preferences }, { data: primaryGoal }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: preferences, error: preferencesError }, { data: primaryGoal, error: goalError }] = await Promise.all([
     supabase.from("profiles")
       .select("display_name,profession,experience_level,interests,timezone")
       .eq("id", user.id).maybeSingle(),
@@ -58,6 +59,8 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
       .eq("user_id", user.id).eq("status", "active")
       .order("created_at", { ascending: true }).limit(1).maybeSingle(),
   ]);
+
+  if (profileError || preferencesError || goalError) throw new Error("Unable to load onboarding details.");
 
   const message = error === "invalid_input"
     ? "Please complete the required fields and check your selections."
@@ -87,7 +90,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
         {message && <div className="auth-error" role="alert">{message}</div>}
 
         <form action={saveOnboarding} className="onboarding-form">
-          <input type="hidden" name="goal_id" value={primaryGoal?.id ?? ""} />
+          <input type="hidden" name="goal_id" value={primaryGoal?.id ?? crypto.randomUUID()} />
 
           <section className="onboarding-section">
             <div>
@@ -195,7 +198,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
 
           <div className="onboarding-submit">
             <p>Your profile is private. Updating it will update your primary goal, not create another copy.</p>
-            <button className="site-button" type="submit">Save profile & continue ↗</button>
+            <SubmitButton>Save profile & continue ↗</SubmitButton>
           </div>
         </form>
       </section>

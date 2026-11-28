@@ -1,3 +1,4 @@
+import SubmitButton from "../../components/submit-button";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requestPasswordReset } from "../../actions/auth";
@@ -19,7 +20,7 @@ export default async function ForgotPassword({ searchParams }: { searchParams: P
     {error ? <div className="auth-error" role="alert">{error === "invalid_input" ? "Enter a valid email address." : "We couldn't send the reset email. Please try again."}</div> : null}
     <form action={requestPasswordReset} className="auth-form">
       <label>Email address <input name="email" type="email" autoComplete="email" required maxLength={254} placeholder="you@example.com"/></label>
-      <button className="site-button" type="submit">Send recovery link ↗</button>
+      <SubmitButton>Send recovery link ↗</SubmitButton>
     </form>
     <p className="auth-switch"><Link href="/auth/sign-in">Back to sign in</Link></p>
   </section></main>;

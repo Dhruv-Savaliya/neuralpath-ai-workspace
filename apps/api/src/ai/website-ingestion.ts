@@ -55,9 +55,12 @@ function requestPage(url: URL, pinnedAddress: string): Promise<PageResponse> {
         Accept: "text/html,application/xhtml+xml,text/plain;q=0.9",
         "Accept-Encoding": "identity",
       },
-      lookup: ((_hostname: string, _options: unknown, callback: (error: NodeJS.ErrnoException | null, address: string, family: number) => void) => {
-        callback(null, pinnedAddress, 4);
-      }) as never,
+      family: 4,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      lookup: (_hostname, options, callback) => {
+        if (options.all) callback(null, [{ address: pinnedAddress, family: 4 }]);
+        else callback(null, pinnedAddress, 4);
+      },
     }, response => {
       const chunks: string[] = [];
       let size = 0;

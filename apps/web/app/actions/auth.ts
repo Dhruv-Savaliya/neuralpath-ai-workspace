@@ -1,5 +1,6 @@
 "use server";
 
+import { safeNextPath } from "../../lib/safe-next-path";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "../../lib/supabase/server";
@@ -12,7 +13,7 @@ async function getAuthRedirectBaseUrl() {
   // Trust only this app's Vercel deployment hosts and local development.
   if (
     normalizedHost === "neuralpathx.vercel.app" ||
-    normalizedHost.startsWith("neuralpath-ai-workspace-") && normalizedHost.endsWith(".vercel.app")
+    (normalizedHost.endsWith(".vercel.app") && normalizedHost === process.env.VERCEL_URL?.toLowerCase())
   ) {
     return `https://${normalizedHost}`;
   }
@@ -24,13 +25,6 @@ async function getAuthRedirectBaseUrl() {
   return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://neuralpathx.vercel.app").replace(/\/$/, "");
 }
 
-function safeNext(value: FormDataEntryValue | null) {
-  const path = typeof value === "string" ? value : "";
-  return path.startsWith("/") && !path.startsWith("//") && !path.includes("\\") && !/[\u0000-\u001f]/.test(path)
-    ? path
-    : "/onboarding";
-}
-
 export async function signUp(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
@@ -40,20 +34,21 @@ export async function signUp(formData: FormData) {
   }
   const supabase = await createClient();
   const redirectBaseUrl = await getAuthRedirectBaseUrl();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email, password, options: {
       data: { display_name: displayName },
       emailRedirectTo: `${redirectBaseUrl}/auth/callback?next=/onboarding`,
     },
   });
   if (error) redirect("/auth/sign-up?error=signup_failed");
+  if (data.session) redirect("/onboarding");
   redirect("/auth/check-email");
 }
 
 export async function signIn(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const next = safeNext(formData.get("next"));
+  const next = safeNextPath(formData.get("next"));
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password || password.length > 128) {
     redirect("/auth/sign-in?error=invalid_input");
   }
@@ -87,12 +82,13 @@ export async function updatePassword(formData: FormData) {
   if (authError || !user) redirect("/auth/sign-in?error=recovery_session_invalid");
   const { error } = await supabase.auth.updateUser({ password });
   if (error) redirect("/auth/update-password?error=update_failed");
-  redirect("/auth/sign-in?error=password_updated");
+  redirect("/dashboard");
 }
 
 export async function signOut() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut({ scope: "local" });
+  if (error) throw new Error("Unable to sign out. Please try again.");
   redirect("/");
 }
 

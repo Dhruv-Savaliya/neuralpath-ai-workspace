@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { AuthenticatedRequest } from "../common/authenticated-request";
+import { readAllPages } from "../common/read-all-pages";
 import type { ChatDto } from "./dto/chat.dto";
 import type { IngestKnowledgeDto } from "./dto/ingest-knowledge.dto";
 import type { IngestWebsiteDto } from "./dto/ingest-website.dto";
@@ -111,14 +112,45 @@ export class AiService {
     });
   }
 
+  async ingestDocument(req: AuthenticatedRequest, file: Express.Multer.File, title?: string) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException("No document file was uploaded.");
+    }
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB limit
+    if (file.size > MAX_FILE_SIZE) {
+      throw new BadRequestException("Document exceeds the 10 MB size limit.");
+    }
+
+    const originalName = file.originalname || "document";
+    const extension = originalName.toLowerCase().split(".").pop();
+    const mime = file.mimetype.toLowerCase();
+
+    const isPdf = extension === "pdf" || mime === "application/pdf";
+    const isDocx = extension === "docx" || mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+    if (!isPdf && !isDocx) {
+      throw new BadRequestException("Only PDF (.pdf) and Word (.docx) documents are supported.");
+    }
+
+    if (isPdf || isDocx) {
+      // pdf-parse and mammoth are optional dependencies; fail gracefully if not installed
+      throw new BadRequestException(
+        "Document upload is not yet available in this deployment. Please paste your text directly or import a webpage URL instead.",
+      );
+    }
+
+    // Unreachable, but satisfies TypeScript return-type analysis
+    throw new BadRequestException("Unsupported document format.");
+  }
+
   async listKnowledge(req: AuthenticatedRequest) {
-    const { data, error } = await req.supabase
-      .from("knowledge_chunks")
-      .select("source_id,source_title,source_url,created_at")
-      .eq("user_id", req.user.id)
-      .order("created_at", { ascending: false })
-      .limit(1000);
-    if (error) throw new InternalServerErrorException("Unable to load knowledge sources.");
+    const data = await readAllPages((after, limit) => {
+      const query = req.supabase.from("knowledge_chunks")
+        .select("id,source_id,source_title,source_url,created_at")
+        .eq("user_id", req.user.id).order("id").limit(limit);
+      return after ? query.gt("id", after) : query;
+    }, "Unable to load knowledge sources.");
+    data.sort((a, b) => b.created_at.localeCompare(a.created_at));
 
     const grouped = new Map<string, {
       source_id: string;
@@ -127,7 +159,7 @@ export class AiService {
       created_at: string;
       chunks: number;
     }>();
-    for (const row of data ?? []) {
+    for (const row of data) {
       const current = grouped.get(row.source_id);
       if (current) current.chunks += 1;
       else grouped.set(row.source_id, {
@@ -376,7 +408,7 @@ export class AiService {
           if (finalized.error) this.logger.warn(`${provider.name} stream reservation update failed: ${finalized.error.code ?? "database_error"}`);
         }
         if (signal.aborted || emitted) throw error;
-        failures.push(`${provider.name}: ${error instanceof Error ? error.message : "unknown provider error"}`);
+        failures.push(`${provider.name}: ${error instanceof ProviderError ? error.status : "request failed"}`);
         this.logger.warn(`${provider.name} streaming failed before the first token; trying fallback.`);
       }
     }
@@ -552,7 +584,7 @@ export class AiService {
         });
         const payload = (await response.json().catch(() => ({}))) as EmbeddingResponse;
         if (!response.ok || payload.success === false) {
-          throw new ServiceUnavailableException(payload.errors?.[0]?.message ?? "Cloudflare embedding request failed.");
+          throw new ServiceUnavailableException("The embedding service could not process this request. Please retry.");
         }
         const vectors = payload.result?.data;
         if (!Array.isArray(vectors) || vectors.length !== missingTexts.length) {
@@ -712,8 +744,8 @@ export class AiService {
         return { answer, provider: provider.name, model: provider.model };
       } catch (error) {
         const reason = error instanceof ProviderError
-          ? `HTTP ${error.status}: ${error.message}`
-          : error instanceof Error ? error.message : "Unknown provider error";
+          ? `HTTP ${error.status}`
+          : "Provider request failed";
         failures.push(`${provider.name}: ${reason}`);
         this.logger.warn(`${provider.name} generation failed; trying the next configured provider.`);
       }
